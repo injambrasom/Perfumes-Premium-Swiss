@@ -1,0 +1,16 @@
+{
+  "entities": {
+    "inventory": {
+      "title": "Inventory Stock",
+      "description": "Stock quantities for each product ID and bottle size",
+      "type": "object",
+      "properties": {
+        "15ml": { "type": "number" },
+        "55ml": { "type": "number" },
+        "100ml": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["15ml", "55ml", "100ml"]
+    }
+  }
+}

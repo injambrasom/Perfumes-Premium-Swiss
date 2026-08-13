@@ -1,0 +1,6 @@
+{
+  "name": "Perfumes Premium Swiss",
+  "description": "Ateliê de alta perfumaria de luxo com fragrâncias de excelência inspiradas em grandes ícones internacionais.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
