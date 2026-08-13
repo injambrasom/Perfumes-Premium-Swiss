@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --color-gold: #C5A059;
+  --color-soft-grey: #F8F8F8;
+}
+
+@layer utilities {
+  .font-serif {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+  .font-sans {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .letter-spacing-tight {
+    letter-spacing: -0.05em;
+  }
+  .letter-spacing-wide {
+    letter-spacing: 0.15em;
+  }
+  .gold-detail {
+    color: #C5A059;
+  }
+  .bg-soft-grey {
+    background-color: #F8F8F8;
+  }
+  .border-luxury {
+    border-color: rgba(0, 0, 0, 0.08);
+  }
+  .aspect-3-4 {
+    aspect-ratio: 3 / 4;
+  }
+}
+
+/* Global sleek interface overrides */
+html, body {
+  font-family: 'Inter', sans-serif;
+  background-color: #000000;
+  color: #171717;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+::selection {
+  background-color: #C5A059;
+  color: #ffffff;
+}

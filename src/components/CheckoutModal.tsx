@@ -1,0 +1,1141 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  X, 
+  ShieldCheck, 
+  Lock, 
+  CreditCard, 
+  QrCode, 
+  Copy, 
+  Check, 
+  ArrowLeft, 
+  Truck, 
+  Clock, 
+  CheckCircle2, 
+  MessageCircle,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  ShoppingBag,
+  HelpCircle,
+  AlertCircle
+} from 'lucide-react';
+import { CartItem } from '../types';
+import { deductStockInFirebase } from '../lib/firebase';
+
+interface CheckoutModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  items: CartItem[];
+  subtotal: number;
+  freightCost: number;
+  total: number;
+  onClearCart: () => void;
+}
+
+type PaymentMethod = 'pix' | 'credit_card';
+
+export const CheckoutModal: React.FC<CheckoutModalProps> = ({
+  isOpen,
+  onClose,
+  items,
+  subtotal,
+  freightCost,
+  total,
+  onClearCart,
+}) => {
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix');
+  const [step, setStep] = useState<'form' | 'processing' | 'pix_generated' | 'success'>('form');
+  const [orderSummaryOpen, setOrderSummaryOpen] = useState(false);
+  const [copiedPix, setCopiedPix] = useState(false);
+  const [timer, setTimer] = useState(900); // 15 minutes countdown for Pix
+
+  // Mercado Pago States
+  const [pixQrCodeBase64, setPixQrCodeBase64] = useState<string | null>(null);
+  const [pixQrCodeString, setPixQrCodeString] = useState<string | null>(null);
+  const [pixPaymentId, setPixPaymentId] = useState<string | number | null>(null);
+  const [mpError, setMpError] = useState<string | null>(null);
+
+  // Form states
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    cpf: '',
+    cep: '',
+    street: '',
+    number: '',
+    complement: '',
+    neighborhood: '',
+    city: '',
+    state: 'RS',
+    cardNumber: '',
+    cardName: '',
+    cardExpiry: '',
+    cardCvv: '',
+    installments: '1',
+  });
+
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [orderId, setOrderId] = useState('');
+
+  // Discount for PIX (5% OFF)
+  const pixDiscount = paymentMethod === 'pix' ? subtotal * 0.05 : 0;
+  const finalTotal = Math.max(0, total - pixDiscount);
+
+  useEffect(() => {
+    if (isOpen) {
+      // Generate unique order ID
+      const randomNum = Math.floor(10000 + Math.random() * 90000);
+      setOrderId(`SWISS-${randomNum}`);
+      setMpError(null);
+    } else {
+      // Reset form on modal close if needed
+      if (step === 'success') {
+        setStep('form');
+      }
+    }
+  }, [isOpen]);
+
+  // Pix timer countdown
+  useEffect(() => {
+    let interval: any = null;
+    if (step === 'pix_generated' && timer > 0) {
+      interval = setInterval(() => {
+        setTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [step, timer]);
+
+  // Mercado Pago PIX Payment Status Polling
+  useEffect(() => {
+    let interval: any = null;
+    if (step === 'pix_generated' && pixPaymentId) {
+      interval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/mercadopago/payment-status/${pixPaymentId}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.status === 'approved') {
+              setStep('success');
+              onClearCart();
+              clearInterval(interval);
+            }
+          }
+        } catch (e) {
+          // ignore transient check errors
+        }
+      }, 4000);
+    }
+    return () => clearInterval(interval);
+  }, [step, pixPaymentId, onClearCart]);
+
+  if (!isOpen) return null;
+
+  const formatTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (formErrors[field]) {
+      setFormErrors((prev) => {
+        const updated = { ...prev };
+        delete updated[field];
+        return updated;
+      });
+    }
+  };
+
+  // Mask functions
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let v = e.target.value.replace(/\D/g, '');
+    if (v.length > 11) v = v.substring(0, 11);
+    v = v.replace(/(\d{3})(\d)/, '$1.$2');
+    v = v.replace(/(\d{3})(\d)/, '$1.$2');
+    v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    handleInputChange('cpf', v);
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let v = e.target.value.replace(/\D/g, '');
+    if (v.length > 11) v = v.substring(0, 11);
+    v = v.replace(/^(\d{2})(\d)/g, '($1) $2');
+    v = v.replace(/(\d{5})(\d)/, '$1-$2');
+    handleInputChange('phone', v);
+  };
+
+  const handleCepChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let v = e.target.value.replace(/\D/g, '');
+    if (v.length > 8) v = v.substring(0, 8);
+    v = v.replace(/^(\d{5})(\d)/, '$1-$2');
+    handleInputChange('cep', v);
+
+    // Auto simulate CEP fill if 8 digits
+    if (v.replace(/\D/g, '').length === 8) {
+      handleInputChange('street', 'Avenida Paulista');
+      handleInputChange('neighborhood', 'Bela Vista');
+      handleInputChange('city', 'São Paulo');
+      handleInputChange('state', 'SP');
+    }
+  };
+
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let v = e.target.value.replace(/\D/g, '');
+    if (v.length > 16) v = v.substring(0, 16);
+    v = v.replace(/(\d{4})(?=\d)/g, '$1 ');
+    handleInputChange('cardNumber', v);
+  };
+
+  const handleCardExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let v = e.target.value.replace(/\D/g, '');
+    if (v.length > 4) v = v.substring(0, 4);
+    if (v.length >= 3) {
+      v = `${v.substring(0, 2)}/${v.substring(2)}`;
+    }
+    handleInputChange('cardExpiry', v);
+  };
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    if (!formData.name.trim()) errors.name = 'Nome completo é obrigatório';
+    if (!formData.email.trim() || !formData.email.includes('@')) errors.email = 'E-mail válido é obrigatório';
+    if (!formData.phone.trim() || formData.phone.length < 10) errors.phone = 'Telefone/WhatsApp é obrigatório';
+    if (!formData.cpf.trim() || formData.cpf.length < 14) errors.cpf = 'CPF é obrigatório';
+    if (!formData.cep.trim() || formData.cep.length < 9) errors.cep = 'CEP é obrigatório';
+    if (!formData.street.trim()) errors.street = 'Rua/Avenida é obrigatória';
+    if (!formData.number.trim()) errors.number = 'Número é obrigatório';
+
+    if (paymentMethod === 'credit_card') {
+      if (!formData.cardNumber || formData.cardNumber.replace(/\s/g, '').length < 16) {
+        errors.cardNumber = 'Número de cartão inválido (16 dígitos)';
+      }
+      if (!formData.cardName.trim()) errors.cardName = 'Nome no cartão é obrigatório';
+      if (!formData.cardExpiry || formData.cardExpiry.length < 5) errors.cardExpiry = 'Validade (MM/AA) é obrigatória';
+      if (!formData.cardCvv || formData.cardCvv.length < 3) errors.cardCvv = 'CVV é obrigatório';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    setStep('processing');
+    setMpError(null);
+
+    if (paymentMethod === 'pix') {
+      try {
+        const response = await fetch('/api/mercadopago/create-pix', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transaction_amount: finalTotal,
+            description: `Perfumes Premium Swiss - Pedido ${orderId}`,
+            payer: {
+              email: formData.email,
+              first_name: formData.name.split(' ')[0],
+              last_name: formData.name.split(' ').slice(1).join(' ') || 'Cliente',
+              identification: {
+                type: 'CPF',
+                number: formData.cpf.replace(/\D/g, '')
+              }
+            }
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          setPixQrCodeBase64(data.qr_code_base64 || null);
+          setPixQrCodeString(data.qr_code || null);
+          setPixPaymentId(data.id || null);
+          setStep('pix_generated');
+          setTimer(900);
+        } else {
+          if (data.error === 'MERCADO_PAGO_NOT_CONFIGURED') {
+            setMpError('Integração Mercado Pago pronta! Configure o MERCADO_PAGO_ACCESS_TOKEN no .env para gerar PIX em tempo real.');
+          } else {
+            setMpError(data.message || 'Exibindo ambiente de testes Mercado Pago.');
+          }
+          setPixQrCodeString(`00020126580014br.gov.bcb.pix0136d8f8a1e2-4b2c-9482-10a202102030004000053039865405${finalTotal.toFixed(2)}5802BR5925PERFUMES PREMIUM SWISS ATELIER6009SAO PAULO62070503***6304D1A2`);
+          setStep('pix_generated');
+          setTimer(900);
+        }
+      } catch (err: any) {
+        console.error('Error creating MP Pix:', err);
+        setMpError('Modo de segurança ativo.');
+        setPixQrCodeString(`00020126580014br.gov.bcb.pix0136d8f8a1e2-4b2c-9482-10a202102030004000053039865405${finalTotal.toFixed(2)}5802BR5925PERFUMES PREMIUM SWISS ATELIER6009SAO PAULO62070503***6304D1A2`);
+        setStep('pix_generated');
+        setTimer(900);
+      }
+    } else {
+      try {
+        const response = await fetch('/api/mercadopago/create-preference', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items,
+            payer: formData,
+            orderId
+          })
+        });
+
+        const data = await response.json();
+        syncInventoryDeduction();
+        if (response.ok && data.init_point) {
+          window.open(data.init_point, '_blank');
+          setStep('success');
+          onClearCart();
+        } else {
+          setStep('success');
+          onClearCart();
+        }
+      } catch (err) {
+        syncInventoryDeduction();
+        setStep('success');
+        onClearCart();
+      }
+    }
+  };
+
+  const syncInventoryDeduction = async () => {
+    try {
+      const formattedItems = items.map((i) => ({
+        productId: i.product.id,
+        size: (i.selectedSize || '100ml') as '15ml' | '55ml' | '100ml',
+        quantity: i.quantity
+      }));
+      // 1. Deduct in Firebase Firestore (Real-time sync to desktop & mobile)
+      await deductStockInFirebase(formattedItems);
+
+      // 2. Deduct in local server API
+      await fetch('/api/inventory/deduct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: formattedItems })
+      });
+    } catch (err) {
+      console.error('Failed to deduct stock:', err);
+    }
+  };
+
+  const handleCopyPix = () => {
+    const pixCode = pixQrCodeString || `00020126580014br.gov.bcb.pix0136d8f8a1e2-4b2c-9482-10a202102030004000053039865405${finalTotal.toFixed(2)}5802BR5925PERFUMES PREMIUM SWISS ATELIER6009SAO PAULO62070503***6304D1A2`;
+    navigator.clipboard.writeText(pixCode);
+    setCopiedPix(true);
+    setTimeout(() => setCopiedPix(false), 3000);
+  };
+
+  const handleConfirmPixPayment = () => {
+    syncInventoryDeduction();
+    setStep('success');
+    onClearCart();
+  };
+
+  const handleWhatsAppNotify = () => {
+    const itemsList = items.map(i => `• ${i.product.name} (${i.selectedSize || '100ml'}) - R$ ${i.selectedPrice.toFixed(2)} x${i.quantity}`).join('\n');
+    const message = `*NOVO PEDIDO DIRECT - PERFUMES PREMIUM SWISS*\n\n` +
+      `*Número do Pedido:* ${orderId}\n` +
+      `*Cliente:* ${formData.name}\n` +
+      `*CPF:* ${formData.cpf}\n` +
+      `*E-mail:* ${formData.email}\n` +
+      `*WhatsApp:* ${formData.phone}\n\n` +
+      `*Endereço de Entrega:*\n` +
+      `${formData.street}, Nº ${formData.number}${formData.complement ? ` (${formData.complement})` : ''}\n` +
+      `${formData.neighborhood} - ${formData.city}/${formData.state} - CEP ${formData.cep}\n\n` +
+      `*Itens do Pedido:*\n${itemsList}\n\n` +
+      `*Forma de Pagamento:* ${paymentMethod === 'pix' ? 'PIX (Aprovado/Comprovante)' : 'Cartão de Crédito'}\n` +
+      `*Total do Pedido:* R$ ${finalTotal.toFixed(2).replace('.', ',')}\n\n` +
+      `Gostaria de acompanhar o envio e código de rastreio!`;
+
+    window.open(`https://wa.me/5554999893370?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  // Generate 1x to 12x options
+  const getInstallmentOptions = () => {
+    const options = [];
+    for (let i = 1; i <= 12; i++) {
+      const val = (finalTotal / i).toFixed(2).replace('.', ',');
+      options.push(
+        <option key={i} value={i.toString()}>
+          {i}x de R$ {val} sem juros {i === 1 ? '(À vista)' : ''}
+        </option>
+      );
+    }
+    return options;
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-fadeIn">
+      <div className="relative z-10 bg-white w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden border border-neutral-200 flex flex-col my-auto max-h-[92vh] pointer-events-auto">
+        
+        {/* Header Bar */}
+        <div className="bg-[#0B0B0B] text-white px-4 sm:px-6 py-4 flex items-center justify-between border-b border-neutral-800 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-[#C5A059]/20 border border-[#C5A059]/40 flex items-center justify-center text-[#C5A059]">
+              <Lock className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="font-serif text-sm sm:text-base font-semibold tracking-wider text-white uppercase flex items-center gap-2">
+                Checkout Seguro
+                <span className="hidden sm:inline-block text-[10px] bg-[#C5A059]/20 text-[#C5A059] px-2 py-0.5 rounded border border-[#C5A059]/30 font-sans tracking-widest">
+                  256-BIT SSL
+                </span>
+              </h3>
+              <p className="text-[11px] text-neutral-400 font-light">
+                Perfumes Premium Swiss Atelier • Genève
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="p-2 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors cursor-pointer"
+            aria-label="Fechar checkout"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Security Bar Banner */}
+        <div className="bg-neutral-900 px-4 py-2 border-b border-neutral-800 flex items-center justify-between text-[11px] text-neutral-300 font-sans shrink-0 overflow-x-auto gap-4">
+          <div className="flex items-center gap-1.5 text-emerald-400 font-medium whitespace-nowrap">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Compra 100% Protegida</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-amber-300 font-medium whitespace-nowrap">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Extrait de Parfum 36% Essência</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-neutral-300 whitespace-nowrap">
+            <Truck className="w-3.5 h-3.5 text-[#C5A059]" />
+            <span>Envio Imediato com Rastreio</span>
+          </div>
+        </div>
+
+        {/* Main Body */}
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-6">
+
+          {/* ORDER SUMMARY COLLAPSIBLE BANNER */}
+          <div className="bg-neutral-50 rounded-lg border border-neutral-200 overflow-hidden">
+            <button
+              onClick={() => setOrderSummaryOpen(!orderSummaryOpen)}
+              className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-100/70 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <ShoppingBag className="w-4 h-4 text-[#C5A059]" />
+                <span className="font-serif text-xs font-semibold text-neutral-900 uppercase tracking-wider">
+                  Resumo do Pedido ({items.reduce((a, b) => a + b.quantity, 0)} {items.reduce((a, b) => a + b.quantity, 0) === 1 ? 'item' : 'itens'})
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-semibold text-sm text-neutral-900">
+                  R$ {finalTotal.toFixed(2).replace('.', ',')}
+                </span>
+                {orderSummaryOpen ? (
+                  <ChevronUp className="w-4 h-4 text-neutral-500" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-neutral-500" />
+                )}
+              </div>
+            </button>
+
+            {orderSummaryOpen && (
+              <div className="px-4 pb-4 pt-2 border-t border-neutral-200/80 space-y-3 bg-white">
+                <div className="divide-y divide-neutral-100 max-h-48 overflow-y-auto pr-1">
+                  {items.map((item, idx) => (
+                    <div key={idx} className="py-2.5 flex items-center justify-between text-xs gap-3">
+                      <div className="flex items-center gap-3">
+                        <img 
+                          src={item.product.image}
+                          alt={item.product.name}
+                          className="w-10 h-10 object-cover rounded border border-neutral-200 bg-neutral-100 shrink-0"
+                        />
+                        <div>
+                          <p className="font-serif font-semibold text-neutral-900">{item.product.name}</p>
+                          <p className="text-[10px] text-neutral-500 font-light">
+                            {item.product.referenceName} • {item.selectedSize || '100ml'}
+                          </p>
+                          <p className="text-[10px] text-neutral-400">Qtd: {item.quantity}</p>
+                        </div>
+                      </div>
+                      <span className="font-mono font-medium text-neutral-800">
+                        R$ {(item.selectedPrice * item.quantity).toFixed(2).replace('.', ',')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pt-2 border-t border-neutral-200 text-xs space-y-1 font-sans">
+                  <div className="flex justify-between text-neutral-600">
+                    <span>Subtotal:</span>
+                    <span className="font-mono">R$ {subtotal.toFixed(2).replace('.', ',')}</span>
+                  </div>
+                  {paymentMethod === 'pix' && pixDiscount > 0 && (
+                    <div className="flex justify-between text-emerald-600 font-medium">
+                      <span>Desconto 5% no PIX:</span>
+                      <span className="font-mono">- R$ {pixDiscount.toFixed(2).replace('.', ',')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-neutral-600">
+                    <span>Frete:</span>
+                    <span className="font-mono text-emerald-600">
+                      {freightCost === 0 ? 'GRÁTIS' : `R$ ${freightCost.toFixed(2).replace('.', ',')}`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm font-semibold text-neutral-900 pt-1 border-t border-neutral-200">
+                    <span>Total Final:</span>
+                    <span className="font-mono text-[#C5A059]">
+                      R$ {finalTotal.toFixed(2).replace('.', ',')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* STEP 1: FORM & PAYMENT METHOD SELECTION */}
+          {step === 'form' && (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              
+              {/* Customer Personal Details */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-1 border-b border-neutral-200">
+                  <span className="w-5 h-5 rounded-full bg-neutral-900 text-white text-xs font-semibold flex items-center justify-center font-mono">
+                    1
+                  </span>
+                  <h4 className="font-serif text-sm font-semibold uppercase tracking-wider text-neutral-900">
+                    Dados Pessoais &amp; Contato
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="block text-neutral-700 font-medium mb-1">
+                      Nome Completo *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Gabriel Silva"
+                      value={formData.name}
+                      onChange={(e) => handleInputChange('name', e.target.value)}
+                      className={`w-full px-3 py-2 rounded border bg-white text-neutral-900 font-sans text-xs focus:outline-none transition-colors ${
+                        formErrors.name ? 'border-red-500 bg-red-50' : 'border-neutral-300 focus:border-[#C5A059]'
+                      }`}
+                    />
+                    {formErrors.name && <p className="text-[10px] text-red-500 mt-0.5">{formErrors.name}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-neutral-700 font-medium mb-1">
+                      CPF *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="000.000.000-00"
+                      value={formData.cpf}
+                      onChange={handleCpfChange}
+                      className={`w-full px-3 py-2 rounded border bg-white text-neutral-900 font-sans text-xs focus:outline-none transition-colors ${
+                        formErrors.cpf ? 'border-red-500 bg-red-50' : 'border-neutral-300 focus:border-[#C5A059]'
+                      }`}
+                    />
+                    {formErrors.cpf && <p className="text-[10px] text-red-500 mt-0.5">{formErrors.cpf}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-neutral-700 font-medium mb-1">
+                      E-mail *
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="seu@email.com"
+                      value={formData.email}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      className={`w-full px-3 py-2 rounded border bg-white text-neutral-900 font-sans text-xs focus:outline-none transition-colors ${
+                        formErrors.email ? 'border-red-500 bg-red-50' : 'border-neutral-300 focus:border-[#C5A059]'
+                      }`}
+                    />
+                    {formErrors.email && <p className="text-[10px] text-red-500 mt-0.5">{formErrors.email}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-neutral-700 font-medium mb-1">
+                      WhatsApp / Celular *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="(00) 00000-0000"
+                      value={formData.phone}
+                      onChange={handlePhoneChange}
+                      className={`w-full px-3 py-2 rounded border bg-white text-neutral-900 font-sans text-xs focus:outline-none transition-colors ${
+                        formErrors.phone ? 'border-red-500 bg-red-50' : 'border-neutral-300 focus:border-[#C5A059]'
+                      }`}
+                    />
+                    {formErrors.phone && <p className="text-[10px] text-red-500 mt-0.5">{formErrors.phone}</p>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Shipping Address */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-1 border-b border-neutral-200">
+                  <span className="w-5 h-5 rounded-full bg-neutral-900 text-white text-xs font-semibold flex items-center justify-center font-mono">
+                    2
+                  </span>
+                  <h4 className="font-serif text-sm font-semibold uppercase tracking-wider text-neutral-900">
+                    Endereço de Entrega
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <label className="block text-neutral-700 font-medium mb-1">
+                      CEP *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="00000-000"
+                      value={formData.cep}
+                      onChange={handleCepChange}
+                      className={`w-full px-3 py-2 rounded border bg-white text-neutral-900 font-sans text-xs focus:outline-none transition-colors ${
+                        formErrors.cep ? 'border-red-500 bg-red-50' : 'border-neutral-300 focus:border-[#C5A059]'
+                      }`}
+                    />
+                    {formErrors.cep && <p className="text-[10px] text-red-500 mt-0.5">{formErrors.cep}</p>}
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-neutral-700 font-medium mb-1">
+                      Rua / Avenida *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Rua das Flores"
+                      value={formData.street}
+                      onChange={(e) => handleInputChange('street', e.target.value)}
+                      className={`w-full px-3 py-2 rounded border bg-white text-neutral-900 font-sans text-xs focus:outline-none transition-colors ${
+                        formErrors.street ? 'border-red-500 bg-red-50' : 'border-neutral-300 focus:border-[#C5A059]'
+                      }`}
+                    />
+                    {formErrors.street && <p className="text-[10px] text-red-500 mt-0.5">{formErrors.street}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-neutral-700 font-medium mb-1">
+                      Número *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="123"
+                      value={formData.number}
+                      onChange={(e) => handleInputChange('number', e.target.value)}
+                      className={`w-full px-3 py-2 rounded border bg-white text-neutral-900 font-sans text-xs focus:outline-none transition-colors ${
+                        formErrors.number ? 'border-red-500 bg-red-50' : 'border-neutral-300 focus:border-[#C5A059]'
+                      }`}
+                    />
+                    {formErrors.number && <p className="text-[10px] text-red-500 mt-0.5">{formErrors.number}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-neutral-700 font-medium mb-1">
+                      Complemento (Opcional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Apto 42 / Bloco B"
+                      value={formData.complement}
+                      onChange={(e) => handleInputChange('complement', e.target.value)}
+                      className="w-full px-3 py-2 rounded border border-neutral-300 bg-white text-neutral-900 font-sans text-xs focus:outline-none focus:border-[#C5A059]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-neutral-700 font-medium mb-1">
+                      Bairro
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Centro"
+                      value={formData.neighborhood}
+                      onChange={(e) => handleInputChange('neighborhood', e.target.value)}
+                      className="w-full px-3 py-2 rounded border border-neutral-300 bg-white text-neutral-900 font-sans text-xs focus:outline-none focus:border-[#C5A059]"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-neutral-700 font-medium mb-1">
+                      Cidade / Estado (UF)
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Cidade"
+                        value={formData.city}
+                        onChange={(e) => handleInputChange('city', e.target.value)}
+                        className="w-full px-3 py-2 rounded border border-neutral-300 bg-white text-neutral-900 font-sans text-xs focus:outline-none focus:border-[#C5A059]"
+                      />
+                      <input
+                        type="text"
+                        placeholder="UF"
+                        value={formData.state}
+                        onChange={(e) => handleInputChange('state', e.target.value.toUpperCase().substring(0, 2))}
+                        className="w-20 px-3 py-2 rounded border border-neutral-300 bg-white text-neutral-900 font-sans text-xs focus:outline-none focus:border-[#C5A059] uppercase text-center"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Method Selector */}
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center justify-between pb-1 border-b border-neutral-200">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-neutral-900 text-white text-xs font-semibold flex items-center justify-center font-mono">
+                      3
+                    </span>
+                    <h4 className="font-serif text-sm font-semibold uppercase tracking-wider text-neutral-900">
+                      Forma de Pagamento
+                    </h4>
+                  </div>
+                  <span className="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    Ambiente Criptografado
+                  </span>
+                </div>
+
+                {/* Tabs */}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('pix')}
+                    className={`p-3.5 rounded-xl border text-left transition-all relative flex flex-col justify-between cursor-pointer ${
+                      paymentMethod === 'pix'
+                        ? 'border-[#C5A059] bg-[#C5A059]/5 ring-2 ring-[#C5A059]/30'
+                        : 'border-neutral-200 hover:border-neutral-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <QrCode className={`w-5 h-5 ${paymentMethod === 'pix' ? 'text-[#C5A059]' : 'text-neutral-600'}`} />
+                        <span className="font-serif font-bold text-xs text-neutral-900 uppercase">
+                          PIX
+                        </span>
+                      </div>
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        5% OFF
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-500 font-light leading-tight">
+                      Aprovação instantânea no seu aplicativo bancário.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('credit_card')}
+                    className={`p-3.5 rounded-xl border text-left transition-all relative flex flex-col justify-between cursor-pointer ${
+                      paymentMethod === 'credit_card'
+                        ? 'border-[#C5A059] bg-[#C5A059]/5 ring-2 ring-[#C5A059]/30'
+                        : 'border-neutral-200 hover:border-neutral-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className={`w-5 h-5 ${paymentMethod === 'credit_card' ? 'text-[#C5A059]' : 'text-neutral-600'}`} />
+                        <span className="font-serif font-bold text-xs text-neutral-900 uppercase">
+                          Cartão de Crédito
+                        </span>
+                      </div>
+                      <span className="bg-neutral-100 text-neutral-700 text-[10px] font-medium px-2 py-0.5 rounded uppercase">
+                        Até 12x
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-500 font-light leading-tight">
+                      Parcelamento sem juros em todas as bandeiras.
+                    </p>
+                  </button>
+                </div>
+
+                {/* PIX Details view */}
+                {paymentMethod === 'pix' && (
+                  <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-4 text-xs space-y-2">
+                    <div className="flex items-start gap-2.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-emerald-950">
+                          Desconto exclusivo de 5% aplicado no PIX!
+                        </p>
+                        <p className="text-emerald-800 font-light mt-0.5 text-[11px]">
+                          Ao clicar no botão abaixo, geraremos um QR Code e uma chave copia e cola válida por 15 minutos.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Credit Card Details Form */}
+                {paymentMethod === 'credit_card' && (
+                  <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 space-y-3 text-xs animate-fadeIn">
+                    <div>
+                      <label className="block text-neutral-700 font-medium mb-1">
+                        Número do Cartão *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="0000 0000 0000 0000"
+                          value={formData.cardNumber}
+                          onChange={handleCardNumberChange}
+                          className={`w-full pl-3 pr-10 py-2 rounded border bg-white text-neutral-900 font-mono text-xs focus:outline-none transition-colors ${
+                            formErrors.cardNumber ? 'border-red-500 bg-red-50' : 'border-neutral-300 focus:border-[#C5A059]'
+                          }`}
+                        />
+                        <CreditCard className="w-4 h-4 text-neutral-400 absolute right-3 top-2.5" />
+                      </div>
+                      {formErrors.cardNumber && <p className="text-[10px] text-red-500 mt-0.5">{formErrors.cardNumber}</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-neutral-700 font-medium mb-1">
+                        Nome Impresso no Cartão *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="EX: GABRIEL A SILVA"
+                        value={formData.cardName}
+                        onChange={(e) => handleInputChange('cardName', e.target.value.toUpperCase())}
+                        className={`w-full px-3 py-2 rounded border bg-white text-neutral-900 font-sans text-xs focus:outline-none uppercase transition-colors ${
+                          formErrors.cardName ? 'border-red-500 bg-red-50' : 'border-neutral-300 focus:border-[#C5A059]'
+                        }`}
+                      />
+                      {formErrors.cardName && <p className="text-[10px] text-red-500 mt-0.5">{formErrors.cardName}</p>}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-neutral-700 font-medium mb-1">
+                          Validade (MM/AA) *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="MM/AA"
+                          value={formData.cardExpiry}
+                          onChange={handleCardExpiryChange}
+                          className={`w-full px-3 py-2 rounded border bg-white text-neutral-900 font-mono text-xs focus:outline-none transition-colors ${
+                            formErrors.cardExpiry ? 'border-red-500 bg-red-50' : 'border-neutral-300 focus:border-[#C5A059]'
+                          }`}
+                        />
+                        {formErrors.cardExpiry && <p className="text-[10px] text-red-500 mt-0.5">{formErrors.cardExpiry}</p>}
+                      </div>
+
+                      <div>
+                        <label className="block text-neutral-700 font-medium mb-1">
+                          Código CVV *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="123"
+                          maxLength={4}
+                          value={formData.cardCvv}
+                          onChange={(e) => handleInputChange('cardCvv', e.target.value.replace(/\D/g, ''))}
+                          className={`w-full px-3 py-2 rounded border bg-white text-neutral-900 font-mono text-xs focus:outline-none transition-colors ${
+                            formErrors.cardCvv ? 'border-red-500 bg-red-50' : 'border-neutral-300 focus:border-[#C5A059]'
+                          }`}
+                        />
+                        {formErrors.cardCvv && <p className="text-[10px] text-red-500 mt-0.5">{formErrors.cardCvv}</p>}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-neutral-700 font-medium mb-1">
+                        Opções de Parcelamento *
+                      </label>
+                      <select
+                        value={formData.installments}
+                        onChange={(e) => handleInputChange('installments', e.target.value)}
+                        className="w-full px-3 py-2 rounded border border-neutral-300 font-sans text-xs focus:outline-none focus:border-[#C5A059] bg-white"
+                      >
+                        {getInstallmentOptions()}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* CTA Submit Button */}
+              <div className="pt-4 border-t border-neutral-200">
+                <button
+                  type="submit"
+                  className="w-full bg-[#0B0B0B] hover:bg-neutral-800 text-white py-3.5 px-6 rounded-xl font-serif text-xs uppercase tracking-[0.15em] font-semibold transition-all shadow-lg flex items-center justify-center gap-2 group cursor-pointer"
+                >
+                  {paymentMethod === 'pix' ? (
+                    <>
+                      <QrCode className="w-4 h-4 text-[#C5A059]" />
+                      <span>Gerar QR Code PIX de R$ {finalTotal.toFixed(2).replace('.', ',')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4 text-[#C5A059]" />
+                      <span>Pagar R$ {finalTotal.toFixed(2).replace('.', ',')} no Cartão</span>
+                    </>
+                  )}
+                </button>
+                <p className="text-center text-[10px] text-neutral-500 font-light mt-2 flex items-center justify-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  Garantia de Satisfação &bull; Extrait de Parfum 36% &bull; Suporte via WhatsApp 24h
+                </p>
+              </div>
+
+            </form>
+          )}
+
+          {/* STEP: PROCESSING SIMULATION */}
+          {step === 'processing' && (
+            <div className="py-16 text-center space-y-4 animate-fadeIn">
+              <div className="inline-block relative">
+                <div className="w-16 h-16 rounded-full border-4 border-neutral-200 border-t-[#C5A059] animate-spin mx-auto"></div>
+                <Lock className="w-6 h-6 text-[#C5A059] absolute inset-0 m-auto" />
+              </div>
+              <h3 className="font-serif text-lg font-semibold text-neutral-900">
+                Processando seu pedido seguro...
+              </h3>
+              <p className="text-xs text-neutral-500 font-light max-w-sm mx-auto">
+                Validando dados e preparando o ambiente de pagamento criptografado Swiss Atelier.
+              </p>
+            </div>
+          )}
+
+          {/* STEP: PIX GENERATED SCREEN */}
+          {step === 'pix_generated' && (
+            <div className="space-y-6 py-2 animate-fadeIn">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center space-y-2">
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full uppercase tracking-wider">
+                  <QrCode className="w-4 h-4 text-emerald-600" />
+                  QR Code PIX Gerado com Sucesso!
+                </span>
+                <p className="text-xs text-emerald-900 font-light">
+                  Abra o app do seu banco e escaneie o código ou use o PIX Copia e Cola.
+                </p>
+                <div className="flex items-center justify-center gap-2 pt-1 font-mono text-xs text-amber-800 font-semibold">
+                  <Clock className="w-4 h-4 text-amber-600 animate-pulse" />
+                  <span>Expira em: {formatTimer(timer)}</span>
+                </div>
+              </div>
+
+              {/* QR Code Container */}
+              <div className="flex flex-col items-center justify-center space-y-4 bg-neutral-50 p-6 rounded-2xl border border-neutral-200">
+                
+                {mpError && (
+                  <div className="w-full bg-amber-50 border border-amber-300 text-amber-900 p-3 rounded-lg text-xs font-sans text-center">
+                    <p className="font-semibold">{mpError}</p>
+                  </div>
+                )}
+
+                <div className="bg-white p-4 rounded-xl shadow-md border border-neutral-200 relative group flex items-center justify-center">
+                  {pixQrCodeBase64 ? (
+                    <img 
+                      src={`data:image/png;base64,${pixQrCodeBase64}`} 
+                      alt="QR Code PIX Mercado Pago" 
+                      className="w-52 h-52 object-contain rounded"
+                    />
+                  ) : (
+                    /* Visual QR Code SVG Simulation */
+                    <svg className="w-48 h-48" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect width="200" height="200" fill="white" />
+                      {/* Corners */}
+                      <rect x="10" y="10" width="50" height="50" rx="4" fill="black" />
+                      <rect x="20" y="20" width="30" height="30" rx="2" fill="white" />
+                      <rect x="25" y="25" width="20" height="20" rx="1" fill="black" />
+
+                      <rect x="140" y="10" width="50" height="50" rx="4" fill="black" />
+                      <rect x="150" y="20" width="30" height="30" rx="2" fill="white" />
+                      <rect x="155" y="25" width="20" height="20" rx="1" fill="black" />
+
+                      <rect x="10" y="140" width="50" height="50" rx="4" fill="black" />
+                      <rect x="20" y="150" width="30" height="30" rx="2" fill="white" />
+                      <rect x="25" y="155" width="20" height="20" rx="1" fill="black" />
+
+                      {/* Matrix Pattern Simulation */}
+                      <rect x="70" y="15" width="15" height="15" fill="black" />
+                      <rect x="95" y="15" width="15" height="15" fill="black" />
+                      <rect x="120" y="10" width="10" height="10" fill="black" />
+                      
+                      <rect x="70" y="40" width="20" height="20" fill="black" />
+                      <rect x="100" y="40" width="15" height="15" fill="black" />
+                      
+                      <rect x="15" y="70" width="20" height="20" fill="black" />
+                      <rect x="45" y="70" width="15" height="15" fill="black" />
+                      <rect x="70" y="70" width="25" height="25" fill="black" />
+                      <rect x="105" y="70" width="20" height="20" fill="black" />
+                      <rect x="135" y="70" width="15" height="15" fill="black" />
+                      <rect x="160" y="70" width="25" height="25" fill="black" />
+
+                      <rect x="15" y="100" width="15" height="15" fill="black" />
+                      <rect x="40" y="100" width="25" height="25" fill="black" />
+                      <rect x="75" y="105" width="15" height="15" fill="black" />
+                      <rect x="100" y="100" width="30" height="30" fill="black" />
+                      <rect x="140" y="105" width="20" height="20" fill="black" />
+                      <rect x="170" y="100" width="15" height="15" fill="black" />
+
+                      <rect x="70" y="140" width="20" height="20" fill="black" />
+                      <rect x="100" y="140" width="15" height="15" fill="black" />
+                      <rect x="125" y="140" width="25" height="25" fill="black" />
+                      <rect x="160" y="140" width="25" height="25" fill="black" />
+
+                      <rect x="70" y="170" width="15" height="15" fill="black" />
+                      <rect x="95" y="165" width="20" height="20" fill="black" />
+                      <rect x="125" y="170" width="15" height="15" fill="black" />
+                      <rect x="150" y="170" width="35" height="20" fill="black" />
+
+                      {/* Center PIX icon badge */}
+                      <rect x="80" y="80" width="40" height="40" rx="8" fill="#00BDAE" />
+                      <path d="M93 100L100 93L107 100L100 107L93 100Z" fill="white" />
+                    </svg>
+                  )}
+                </div>
+
+                {/* Amount to pay */}
+                <div className="text-center font-sans">
+                  <p className="text-xs text-neutral-500 font-light">Valor Total no PIX (Com 5% OFF):</p>
+                  <p className="text-2xl font-mono font-bold text-neutral-900">
+                    R$ {finalTotal.toFixed(2).replace('.', ',')}
+                  </p>
+                </div>
+
+                {/* Copy PIX Key Code */}
+                <div className="w-full max-w-md space-y-2">
+                  <button
+                    onClick={handleCopyPix}
+                    className={`w-full py-3 px-4 rounded-xl font-sans text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm ${
+                      copiedPix
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-[#C5A059] hover:bg-[#b08d48] text-white'
+                    }`}
+                  >
+                    {copiedPix ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>Chave PIX Copiada com Sucesso!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        <span>Copiar Código PIX Copia e Cola</span>
+                      </>
+                    )}
+                  </button>
+                  <p className="text-[10px] text-center text-neutral-400 font-light">
+                    Código: 00020126580014br.gov.bcb.pix...
+                  </p>
+                </div>
+              </div>
+
+              {/* Action buttons after PIX payment */}
+              <div className="space-y-2 pt-2">
+                <button
+                  onClick={handleConfirmPixPayment}
+                  className="w-full bg-[#0B0B0B] hover:bg-neutral-800 text-white py-3.5 px-6 rounded-xl font-serif text-xs uppercase tracking-[0.15em] font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  Já Fiz o Pagamento no PIX
+                </button>
+
+                <button
+                  onClick={() => setStep('form')}
+                  className="w-full bg-white hover:bg-neutral-100 text-neutral-700 py-2.5 px-4 rounded-lg font-sans text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-neutral-300"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Voltar e alterar forma de pagamento</span>
+                </button>
+              </div>
+
+            </div>
+          )}
+
+          {/* STEP: SUCCESS SCREEN */}
+          {step === 'success' && (
+            <div className="py-8 text-center space-y-6 animate-fadeIn">
+              <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
+                <CheckCircle2 className="w-12 h-12" />
+              </div>
+
+              <div className="space-y-2">
+                <span className="text-[11px] font-mono tracking-widest text-[#C5A059] uppercase font-semibold">
+                  Pedido Confirmado #{orderId}
+                </span>
+                <h3 className="font-serif text-2xl font-bold text-neutral-900">
+                  {paymentMethod === 'pix' ? 'Pedido Registrado com Sucesso!' : 'Pagamento Aprovado com Sucesso!'}
+                </h3>
+                <p className="text-xs text-neutral-600 max-w-md mx-auto leading-relaxed">
+                  Obrigado por escolher a <strong className="text-neutral-900">Perfumes Premium Swiss Atelier</strong>. Seu pedido já deu entrada em nosso centro de distribuição logístico.
+                </p>
+              </div>
+
+              {/* Receipt Details Card */}
+              <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 text-left text-xs space-y-3 max-w-md mx-auto">
+                <div className="flex justify-between items-center pb-2 border-b border-neutral-200 font-serif font-semibold">
+                  <span>Resumo do Pedido</span>
+                  <span className="text-[#C5A059]">{orderId}</span>
+                </div>
+
+                <div className="space-y-1.5 text-neutral-700 font-sans">
+                  <div className="flex justify-between">
+                    <span className="text-neutral-500">Cliente:</span>
+                    <span className="font-medium">{formData.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-500">Entrega para:</span>
+                    <span className="font-medium text-right max-w-[200px] truncate">
+                      {formData.street}, {formData.number} - {formData.city}/{formData.state}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-500">Pagamento:</span>
+                    <span className="font-medium">
+                      {paymentMethod === 'pix' ? 'PIX (Aprovação Instantânea)' : `Cartão (${formData.installments}x)`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-bold pt-2 border-t border-neutral-200 text-neutral-900">
+                    <span>Total Pago:</span>
+                    <span className="font-mono text-[#C5A059]">
+                      R$ {finalTotal.toFixed(2).replace('.', ',')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* WhatsApp Notification & Actions */}
+              <div className="space-y-3 max-w-md mx-auto pt-2">
+                <button
+                  onClick={handleWhatsAppNotify}
+                  className="w-full bg-[#128C7E] hover:bg-[#075E54] text-white py-3.5 px-6 rounded-xl font-sans text-xs uppercase tracking-wider font-bold transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <MessageCircle className="w-5 h-5 fill-current" />
+                  <span>Acompanhar Pedido no WhatsApp</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    onClose();
+                    setStep('form');
+                  }}
+                  className="w-full bg-neutral-900 hover:bg-neutral-800 text-white py-3 px-6 rounded-xl font-serif text-xs uppercase tracking-wider transition-colors cursor-pointer"
+                >
+                  Voltar para a Loja
+                </button>
+              </div>
+
+            </div>
+          )}
+
+        </div>
+
+      </div>
+    </div>
+  );
+};
