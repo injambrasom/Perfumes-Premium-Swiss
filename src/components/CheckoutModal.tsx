@@ -1064,16 +1064,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <CheckCircle2 className="w-12 h-12" />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-4">
                 <span className="text-[11px] font-mono tracking-widest text-[#C5A059] uppercase font-semibold">
                   Pedido Confirmado #{orderId}
                 </span>
                 <h3 className="font-serif text-2xl font-bold text-neutral-900">
                   {paymentMethod === 'pix' ? 'Pedido Registrado com Sucesso!' : 'Pagamento Aprovado com Sucesso!'}
                 </h3>
-                <p className="text-xs text-neutral-600 max-w-md mx-auto leading-relaxed">
-                  Obrigado por escolher a <strong className="text-neutral-900">Perfumes Premium Swiss Atelier</strong>. Seu pedido já deu entrada em nosso centro de distribuição logístico.
-                </p>
+                <div className="bg-emerald-50 border-2 border-emerald-500/20 p-4 rounded-xl max-w-md mx-auto shadow-sm">
+                  <p className="text-sm text-emerald-800 font-medium leading-relaxed">
+                    ⚠️ Atenção: Para <strong>finalizar seu pedido</strong> e combinarmos o envio, você precisa clicar no botão do WhatsApp abaixo e nos enviar os detalhes.
+                  </p>
+                </div>
               </div>
 
               {/* Receipt Details Card */}
@@ -1110,23 +1112,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
 
               {/* WhatsApp Notification & Actions */}
-              <div className="space-y-3 max-w-md mx-auto pt-2">
+              <div className="space-y-3 max-w-md mx-auto pt-4">
                 <button
                   onClick={handleWhatsAppNotify}
-                  className="w-full bg-[#128C7E] hover:bg-[#075E54] text-white py-3.5 px-6 rounded-xl font-sans text-xs uppercase tracking-wider font-bold transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white py-4 px-6 rounded-xl font-sans text-sm uppercase tracking-wider font-bold transition-all shadow-xl shadow-[#25D366]/20 flex items-center justify-center gap-3 cursor-pointer animate-pulse hover:animate-none"
                 >
-                  <MessageCircle className="w-5 h-5 fill-current" />
-                  <span>Acompanhar Pedido no WhatsApp</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    onClose();
-                    setStep('form');
-                  }}
-                  className="w-full bg-neutral-900 hover:bg-neutral-800 text-white py-3 px-6 rounded-xl font-serif text-xs uppercase tracking-wider transition-colors cursor-pointer"
-                >
-                  Voltar para a Loja
+                  <MessageCircle className="w-6 h-6 fill-current" />
+                  <span>FINALIZAR PEDIDO NO WHATSAPP</span>
                 </button>
               </div>
 

@@ -15,7 +15,17 @@ import {
   onValue as rtdbOnValue,
   set as rtdbSet
 } from 'firebase/database';
-import firebaseConfig from '../../firebase-applet-config.json';
+const firebaseConfig = {
+  projectId: "gen-lang-client-0216852920",
+  appId: "1:905476022886:web:94f171a6670c3eef4e03a7",
+  apiKey: "AIzaSyCUrY0l_r3_rwU4zlAmu9F0frBK3AUsewM",
+  authDomain: "gen-lang-client-0216852920.firebaseapp.com",
+  firestoreDatabaseId: "ai-studio-79c8f0b3-973d-460a-a7bd-65f19a2fa2e1",
+  storageBucket: "gen-lang-client-0216852920.firebasestorage.app",
+  messagingSenderId: "905476022886",
+  measurementId: "",
+  recaptchaSiteKey: ""
+};
 import { INITIAL_INVENTORY, ProductStockData } from '../data/inventory';
 import {
   resolveSiteProductId,
