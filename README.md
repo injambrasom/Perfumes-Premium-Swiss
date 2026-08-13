@@ -1,20 +1,9 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Imagens dos Perfumes
 
-# Run and deploy your AI Studio app
+Você pode colocar suas imagens de perfumes nesta pasta `public/`.
 
-This contains everything you need to run your app locally.
+Por exemplo:
+- `public/swiss-540.jpg`
+- `public/aventus-royal.jpg`
 
-View your app in AI Studio: https://ai.studio/apps/6b624074-dcce-4860-ae88-a993437e77d4
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Depois, basta alterar a propriedade `image` em `src/data/products.ts` para `/swiss-540.jpg`.
