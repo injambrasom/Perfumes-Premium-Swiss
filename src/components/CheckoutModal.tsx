@@ -252,12 +252,82 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     handleInputChange('cardExpiry', v);
   };
 
+  const isValidCPF = (cpf: string): boolean => {
+    const clean = cpf.replace(/\D/g, '');
+    if (clean.length !== 11) return false;
+    if (/^(\d)\1{10}$/.test(clean)) return false;
+
+    let sum = 0;
+    for (let i = 1; i <= 9; i++) {
+      sum += parseInt(clean.substring(i - 1, i)) * (11 - i);
+    }
+    let remainder = (sum * 10) % 11;
+    if (remainder === 10 || remainder === 11) remainder = 0;
+    if (remainder !== parseInt(clean.substring(9, 10))) return false;
+
+    sum = 0;
+    for (let i = 1; i <= 10; i++) {
+      sum += parseInt(clean.substring(i - 1, i)) * (12 - i);
+    }
+    remainder = (sum * 10) % 11;
+    if (remainder === 10 || remainder === 11) remainder = 0;
+    if (remainder !== parseInt(clean.substring(10, 11))) return false;
+
+    return true;
+  };
+
+  const isValidCNPJ = (cnpj: string): boolean => {
+    const clean = cnpj.replace(/\D/g, '');
+    if (clean.length !== 14) return false;
+    if (/^(\d)\1{13}$/.test(clean)) return false;
+
+    let size = clean.length - 2;
+    let numbers = clean.substring(0, size);
+    const digits = clean.substring(size);
+    let sum = 0;
+    let pos = size - 7;
+    for (let i = size; i >= 1; i--) {
+      sum += parseInt(numbers.charAt(size - i)) * pos--;
+      if (pos < 2) pos = 9;
+    }
+    let result = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+    if (result !== parseInt(digits.charAt(0))) return false;
+
+    size = size + 1;
+    numbers = clean.substring(0, size);
+    sum = 0;
+    pos = size - 7;
+    for (let i = size; i >= 1; i--) {
+      sum += parseInt(numbers.charAt(size - i)) * pos--;
+      if (pos < 2) pos = 9;
+    }
+    result = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+    if (result !== parseInt(digits.charAt(1))) return false;
+
+    return true;
+  };
+
   const validateForm = () => {
     const errors: Record<string, string> = {};
     if (!formData.name.trim()) errors.name = 'Nome completo é obrigatório';
     if (!formData.email.trim() || !formData.email.includes('@')) errors.email = 'E-mail válido é obrigatório';
     if (!formData.phone.trim() || formData.phone.length < 10) errors.phone = 'Telefone/WhatsApp é obrigatório';
-    if (!formData.cpf.trim() || formData.cpf.length < 14) errors.cpf = 'CPF é obrigatório';
+
+    const cleanDoc = formData.cpf.replace(/\D/g, '');
+    if (!cleanDoc) {
+      errors.cpf = 'CPF ou CNPJ é obrigatório';
+    } else if (cleanDoc.length === 11) {
+      if (!isValidCPF(cleanDoc)) {
+        errors.cpf = 'CPF inválido. Verifique o número digitado.';
+      }
+    } else if (cleanDoc.length === 14) {
+      if (!isValidCNPJ(cleanDoc)) {
+        errors.cpf = 'CNPJ inválido. Verifique o número digitado.';
+      }
+    } else {
+      errors.cpf = 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.';
+    }
+
     if (!formData.cep.trim() || formData.cep.length < 9) errors.cep = 'CEP é obrigatório';
     if (!formData.street.trim()) errors.street = 'Rua/Avenida é obrigatória';
     if (!formData.number.trim()) errors.number = 'Número é obrigatório';
@@ -284,6 +354,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     if (paymentMethod === 'pix') {
       try {
+        const cleanDocNum = formData.cpf.replace(/\D/g, '');
         const response = await fetch('/api/mercadopago/create-pix', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -295,8 +366,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               first_name: formData.name.split(' ')[0],
               last_name: formData.name.split(' ').slice(1).join(' ') || 'Cliente',
               identification: {
-                type: 'CPF',
-                number: formData.cpf.replace(/\D/g, '')
+                type: cleanDocNum.length === 14 ? 'CNPJ' : 'CPF',
+                number: cleanDocNum
               }
             }
           })

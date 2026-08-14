@@ -571,25 +571,51 @@ app.post('/api/mercadopago/create-pix', async (req, res) => {
 
     const payment = new Payment(client);
 
-    // Sanitize CPF
-    const cleanCpf = (payer.identification?.number || '').replace(/\D/g, '');
+    // Sanitize CPF / CNPJ
+    const cleanDoc = (payer.identification?.number || payer.cpf || '').replace(/\D/g, '');
 
-    const body = {
+    const payerData: any = {
+      email: payer.email,
+      first_name: payer.first_name || payer.name?.split(' ')[0] || 'Cliente',
+      last_name: payer.last_name || payer.name?.split(' ').slice(1).join(' ') || 'Swiss',
+    };
+
+    if (cleanDoc && (cleanDoc.length === 11 || cleanDoc.length === 14)) {
+      payerData.identification = {
+        type: cleanDoc.length === 14 ? 'CNPJ' : 'CPF',
+        number: cleanDoc
+      };
+    }
+
+    const body: any = {
       transaction_amount: Number(transaction_amount),
       description: description || 'Perfumes Premium Swiss - Pedido',
       payment_method_id: 'pix',
-      payer: {
-        email: payer.email,
-        first_name: payer.first_name || payer.name?.split(' ')[0] || 'Cliente',
-        last_name: payer.last_name || payer.name?.split(' ').slice(1).join(' ') || 'Swiss',
-        identification: {
-          type: 'CPF',
-          number: cleanCpf || '00000000000'
-        }
-      }
+      payer: payerData
     };
 
-    const response = await payment.create({ body });
+    let response;
+    try {
+      response = await payment.create({ body });
+    } catch (err: any) {
+      const errMsg = String(err?.message || err?.cause || JSON.stringify(err) || '');
+      console.warn('[MercadoPago PIX warning]:', errMsg);
+      // If error is caused by invalid identification number, try creating without identification
+      if (errMsg.toLowerCase().includes('identification') || errMsg.toLowerCase().includes('user identification')) {
+        try {
+          const bodyWithoutId = { ...body, payer: { ...payerData } };
+          delete bodyWithoutId.payer.identification;
+          response = await payment.create({ body: bodyWithoutId });
+        } catch (retryErr: any) {
+          return res.status(400).json({
+            error: 'INVALID_CPF',
+            message: 'CPF ou CNPJ digitado é inválido. Por favor, verifique os números digitados.'
+          });
+        }
+      } else {
+        throw err;
+      }
+    }
 
     const pointOfInteraction = response.point_of_interaction?.transaction_data;
 
