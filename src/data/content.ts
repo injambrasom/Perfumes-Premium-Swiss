@@ -1,41 +1,41 @@
 import { Testimonial } from '../types';
 
 export const ANNOUNCEMENT_MESSAGES = [
-  '✨ Essências premium inspiradas nos maiores clássicos da perfumaria mundial',
-  '🇨🇭 Formuladas com extratos das renomadas casas Firmenich (Suíça) e Robertet (França)',
-  '📦 Frete Grátis e rápido para todo o Brasil em compras selecionadas',
-  '📱 Atendimento humanizado e consultoria olfativa instantânea via WhatsApp'
+  '✨ Essências importadas inspiradas nos maiores ícones da perfumaria mundial',
+  '🇨🇭 36% de Concentração Extrait de Parfum em todos os frascos',
+  '📦 Frete rápido e seguro para todo o Brasil',
+  '📱 Consultoria olfativa individual via WhatsApp'
 ];
 
 export const DIFFERENTIALS_LIST = [
   {
-    title: 'Essências Internacionalmente Renomadas',
-    desc: 'Utilizamos matérias-primas provenientes de Firmenich (Suíça) e Robertet (França).',
+    title: 'Essências Importadas',
+    desc: 'Matérias-primas provenientes de fornecedores especializados em perfumaria internacional.',
     iconName: 'Sparkles'
   },
   {
-    title: 'Alta Concentração Extrait de Parfum (36%)',
-    desc: '36% de essência pura em todos os tamanhos (15ml, 55ml e 100ml) para máxima fixação e rastro marcante.',
+    title: '36% de Concentração',
+    desc: 'Alta concentração de fragrância na formulation em todos os tamanhos (15ml, 55ml e 100ml).',
     iconName: 'ShieldCheck'
   },
   {
-    title: 'Fixação de 8h a 12h+',
-    desc: 'Formulação estabilizada para alta retenção na pele e roupas.',
+    title: 'Fixação Estimada: 8h a 12h',
+    desc: 'Desenvolvimento olfativo marcante na pele e tecidos.',
     iconName: 'Clock'
   },
   {
-    title: 'Excelente Projeção Olfativa',
-    desc: 'Difusão harmônica das notas sem agressão cítrica inicial.',
+    title: 'Projeção Envolvente',
+    desc: 'Difusão harmônica das notas com presença sofisticada.',
     iconName: 'Zap'
   },
   {
-    title: 'Frascos & Acabamento de Luxo',
-    desc: 'Vidro pesado, borrifador de névoa fina e embalagem elegante.',
+    title: 'Produto Real',
+    desc: 'Fotografias e embalagens fiéis aos produtos entregues em sua residência.',
     iconName: 'Gem'
   },
   {
-    title: 'Atendimento Consultivo Humanizado',
-    desc: 'Especialistas prontos para indicar a fragrância perfeita para seu perfil.',
+    title: 'Atendimento Humano',
+    desc: 'Consultores olfativos dedicados a orientar a escolha ideal para o seu perfil.',
     iconName: 'Headphones'
   }
 ];
@@ -43,36 +43,36 @@ export const DIFFERENTIALS_LIST = [
 export const WHY_CHOOSE_PILLARS = [
   {
     number: '01',
-    title: 'Essências de Origem Internacional',
-    text: 'Selecionamos essências provenientes das tradicionais casas Firmenich (Suíça) e Robertet (França), reconhecidas mundialmente pela excelência na criação de fragrâncias de alta perfumaria.'
+    title: '36% DE CONCENTRAÇÃO',
+    text: 'Alta concentração de fragrância na formulacão em todos os tamanhos. Presença olfativa marcante e envolvente.'
   },
   {
     number: '02',
-    title: 'Qualidade Premium & 36% Essência',
-    text: 'Cada perfume possui 36% de concentração de essência pura em todos os tamanhos (15ml, 55ml e 100ml), com fixação comprovada de 8h a 12h+ na pele.'
+    title: 'ESSÊNCIAS IMPORTADAS',
+    text: 'Utilizamos matérias-primas provenientes de fornecedores especializados em perfumaria internacional de alta qualidade.'
   },
   {
     number: '03',
-    title: 'Valores Acessíveis Sem Compromissos',
-    text: 'Valores transparentes: 15ml por R$ 35,00, 55ml por R$ 80,00 e 100ml por R$ 130,00. A mesma riqueza de marcas internacionais de R$ 2.000+.'
+    title: 'PRODUTO REAL',
+    text: 'Garantia de que as fotografias e apresentações visuais correspondem com fidelidade ao produto comercializado e entregue.'
   },
   {
     number: '04',
-    title: 'Atendimento Especializado & Exclusivo',
-    text: 'Ajudamos você pessoalmente via WhatsApp (54) 99989-3370 a encontrar a assinatura olfativa ideal para seu perfil e ocasiões marcantes.'
+    title: 'ATENDIMENTO HUMANO',
+    text: 'Consultoria olfativa individual via WhatsApp para auxiliar na escolha das fragrâncias perfeitas para o seu estilo e ocasiões.'
   }
 ];
 
 export const COMPARISON_DATA = [
   {
     criteria: 'Origem das Essências',
-    swiss: 'Casas Importadas (Firmenich Suíça & Robertet França)',
-    imported: 'Variada / Grasse & Firmenich',
+    swiss: 'Matérias-primas de Perfumaria Internacional',
+    imported: 'Variada / Marcas de Grife',
     highlight: true
   },
   {
     criteria: 'Concentração de Essência',
-    swiss: 'Extrait de Parfum (36% de Essência Pura)',
+    swiss: 'Extrait de Parfum (36% de Concentração)',
     imported: 'Eau de Parfum / Toilette (12% a 18%)',
     highlight: true
   },
@@ -89,15 +89,15 @@ export const COMPARISON_DATA = [
     highlight: true
   },
   {
-    criteria: 'Tempo de Fixação na Pele',
-    swiss: '8h a 12h+ na pele',
-    imported: '6 a 10 Horas',
+    criteria: 'Fixação Estimada',
+    swiss: '8h a 12h na pele',
+    imported: '6h a 10h',
     highlight: true
   },
   {
-    criteria: 'Atendimento Pós-Venda',
-    swiss: 'Atendimento Direto via WhatsApp (54) 99989-3370',
-    imported: 'Geralmente Impessoal / Lojas de Departamento',
+    criteria: 'Atendimento',
+    swiss: 'Atendimento Direto via WhatsApp com Consultor',
+    imported: 'Atendimento Padronizado de Varejo',
     highlight: false
   }
 ];

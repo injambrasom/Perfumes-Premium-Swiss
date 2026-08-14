@@ -31,9 +31,10 @@ export const FragranceQuizModal: React.FC<FragranceQuizModalProps> = ({
 
   // Calculate matches
   const recommendations = PRODUCTS.filter((p) => {
+    if (!p) return false;
     let matchCount = 0;
     if (selectedGender !== 'Todos' && (p.category === selectedGender || p.category === 'Nicho')) matchCount++;
-    if (selectedOccasion !== 'Todas' && p.occasions.includes(selectedOccasion as PerfumeOccasion)) matchCount++;
+    if (selectedOccasion !== 'Todas' && Array.isArray(p.occasions) && p.occasions.includes(selectedOccasion as PerfumeOccasion)) matchCount++;
     if (selectedFamily !== 'Todas' && p.olfactoryFamily === selectedFamily) matchCount++;
     return matchCount >= 1;
   }).slice(0, 3);

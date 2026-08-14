@@ -181,19 +181,14 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
                 ESGOTADO
               </span>
             )}
-            {product.badges?.slice(0, 2).map((badge) => (
-              <span
-                key={badge}
-                className="px-1.5 py-0.5 bg-black/85 text-white text-[8px] sm:text-[9px] font-semibold tracking-widest uppercase backdrop-blur-md border border-white/10 shadow-sm truncate"
-              >
-                {badge}
-              </span>
-            ))}
+            <span className="px-1.5 py-0.5 bg-black/80 text-neutral-200 text-[8px] sm:text-[9px] font-medium tracking-wider uppercase backdrop-blur-md border border-white/10 shadow-sm truncate">
+              PRODUTO REAL
+            </span>
           </div>
 
           {/* Inspired Reference Badge */}
           <div className="absolute top-2 right-2 z-10 max-w-[65%]">
-            <span className="px-1.5 py-0.5 bg-[#C5A059] text-black text-[8px] sm:text-[10px] font-bold tracking-wider uppercase shadow-md block truncate">
+            <span className="px-1.5 py-0.5 bg-[#C5A059] text-black text-[8px] sm:text-[9px] font-bold tracking-wider uppercase shadow-md block truncate">
               {product.referenceName.startsWith('Inspirado em') ? product.referenceName : `Inspirado em ${product.referenceName}`}
             </span>
           </div>
@@ -205,14 +200,14 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
               className="px-3 py-2 bg-white text-neutral-950 hover:bg-[#C5A059] hover:text-white transition-all text-xs font-semibold tracking-wider uppercase flex items-center gap-1.5 cursor-pointer shadow-md"
             >
               <Eye className="w-3.5 h-3.5" />
-              <span>Notas</span>
+              <span>Ver Detalhes</span>
             </button>
             <button
               onClick={() => onAddToCart(product)}
               className="px-3 py-2 bg-[#C5A059] text-black hover:bg-white transition-all text-xs font-semibold tracking-wider uppercase flex items-center gap-1.5 cursor-pointer shadow-md"
             >
               <ShoppingBag className="w-3.5 h-3.5 text-black" />
-              <span>Comprar</span>
+              <span>Escolher</span>
             </button>
           </div>
         </div>
@@ -236,10 +231,10 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
           </h3>
 
           {/* Inspired Highlight */}
-          <div className={`mt-1 flex items-center gap-1 text-[9px] sm:text-[11px] font-semibold px-1.5 py-0.5 rounded-xs w-full truncate border ${
+          <div className={`mt-1 flex items-center gap-1 text-[9px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-xs w-full truncate border ${
             isDarkMode
-              ? 'text-[#E0C078] bg-[#221C12]/80 border-[#59451C]/60'
-              : 'text-[#8B6B23] bg-amber-50 border-amber-200/80'
+              ? 'text-neutral-300 bg-white/5 border-white/10'
+              : 'text-neutral-700 bg-neutral-100 border-neutral-200'
           }`}>
             <Sparkles className="w-2.5 h-2.5 text-[#C5A059] shrink-0" />
             <span className="truncate">
@@ -249,16 +244,16 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
             </span>
           </div>
 
-          {/* Notes summary (hidden on very small screens to keep height tight) */}
+          {/* Notes summary & Fixation note */}
           <div className={`mt-2 pt-2 border-t space-y-0.5 text-[10px] sm:text-xs font-light hidden sm:block ${
             isDarkMode ? 'border-white/10 text-neutral-300' : 'border-neutral-100 text-neutral-600'
           }`}>
             <p className="truncate">
-              <strong className={isDarkMode ? 'font-medium text-white' : 'font-medium text-neutral-900'}>Notas:</strong>{' '}
+              <span className={isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}>Notas:</span>{' '}
               {product.pyramid?.topNotes?.slice(0, 2).join(', ') || 'Cítrico & Âmbar'}
             </p>
-            <p className="text-[10px] font-mono text-emerald-400 font-medium">
-              ✓ Fixação: {product.fixationHours || '8h a 12h'}
+            <p className="text-[10px] font-mono text-neutral-300 font-medium">
+              Fixação estimada: {product.fixationHours || '8h a 12h'}
             </p>
           </div>
         </div>
@@ -268,23 +263,10 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
       <div className={`p-3 sm:p-4 pt-2 mt-auto border-t flex flex-col gap-2.5 ${
         isDarkMode ? 'border-white/10' : 'border-neutral-100'
       }`}>
-        {/* Stock status row */}
-        {product.stockPerSize && (
-          <div className="text-[9px] font-mono text-[#E0C078] flex items-center justify-between gap-1 font-semibold bg-black/40 px-2 py-1 border border-white/5 rounded-sm">
-            <span className="flex items-center gap-1 shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>Estoque:</span>
-            </span>
-            <span className="truncate text-right">
-              15ml({product.stockPerSize['15ml'] ?? 0}) • 55ml({product.stockPerSize['55ml'] ?? 0}) • 100ml({product.stockPerSize['100ml'] ?? 0})
-            </span>
-          </div>
-        )}
-
         <div className="flex items-center justify-between gap-2 w-full">
           <div className="min-w-0 flex-1">
             <span className="text-[8px] sm:text-[9px] text-neutral-400 block font-light uppercase tracking-wider truncate">
-              36% Essência • A partir de
+              36% Concentração • A partir de
             </span>
             <span className={`font-serif text-sm sm:text-base font-bold whitespace-nowrap ${isDarkMode ? 'text-white' : 'text-neutral-950'}`}>
               R$ 35,00 <span className="text-[9px] sm:text-xs font-sans font-normal text-neutral-400">(15ml)</span>
@@ -294,17 +276,17 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={() => onQuickView(product)}
-              className="px-3 sm:px-4 py-2 bg-[#C5A059] hover:bg-white text-black transition-all text-[10px] sm:text-xs font-bold tracking-wider uppercase cursor-pointer text-center whitespace-nowrap shrink-0"
+              className="px-3 sm:px-4 py-2 bg-white text-black hover:bg-[#C5A059] transition-all text-[10px] sm:text-xs font-bold tracking-wider uppercase cursor-pointer text-center whitespace-nowrap shrink-0"
             >
-              Escolher
+              Escolher Fragrância
             </button>
             <a
               href={`https://wa.me/5554999893370?text=${encodeURIComponent(
-                `PERFUMES PREMIUM SWISS ATELIER\nAtendimento Direct\n\nOlá! Gostaria de comprar o seguinte perfume:\n\nPRODUTO: ${product.name}\n• Referência Olfativa: ${product.referenceName}\n• Concentração: Extrait de Parfum (36% Essência)\n• A partir de R$ 35,00 (15ml)\n\nAguardando atendimento executivo!`
+                `PERFUMES PREMIUM SWISS ATELIER\nAtendimento Direct\n\nOlá! Gostaria de consultar o perfume:\n\nPRODUTO: ${product.name}\n• Referência Olfativa: ${product.referenceName}\n• Concentração: Extrait de Parfum (36% Essência)\n• A partir de R$ 35,00 (15ml)`
               )}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-2 border border-emerald-500/80 text-emerald-400 hover:bg-emerald-600 hover:text-white transition-all rounded-none shrink-0"
+              className="p-2 border border-white/20 text-neutral-300 hover:text-white hover:border-white transition-all rounded-none shrink-0"
               title="Pedir no WhatsApp"
             >
               <MessageCircle className="w-3.5 h-3.5" />

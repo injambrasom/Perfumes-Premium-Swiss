@@ -106,58 +106,43 @@ export const Hero: React.FC<HeroProps> = ({ onChoosePerfume, onOpenWhatsApp, onO
           A ESSÊNCIA DA ALTA PERFUMARIA, REINTERPRETADA.
         </motion.h1>
 
-        {/* Hero Subtitle */}
-        <motion.p
+        {/* Hero Subtitle & Concentration Line */}
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.5 }}
-          className="mt-6 text-sm sm:text-base md:text-lg font-sans font-light tracking-wide text-neutral-200 max-w-xl mx-auto leading-relaxed"
+          className="mt-6 space-y-3 max-w-2xl mx-auto"
         >
-          Essências importadas inspiradas nas fragrâncias mais desejadas do mundo.
-          <span className="block mt-2 text-xs sm:text-sm text-[#C5A059] font-medium tracking-wider uppercase flex items-center justify-center gap-2">
-            <SwissFlagIcon className="w-4 h-4 shadow" />
-            <FranceFlagIcon className="w-4 h-4 shadow" />
-            <span>Formuladas com matérias-primas de Firmenich (Suíça) &amp; Robertet (França)</span>
-          </span>
-        </motion.p>
+          <p className="text-sm sm:text-base md:text-lg font-sans font-light tracking-wide text-neutral-200 leading-relaxed">
+            Essências importadas inspiradas nas fragrâncias mais desejadas do mundo.
+          </p>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs sm:text-sm font-medium tracking-wider text-neutral-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
+            <span>36% de concentração • 15ml, 55ml e 100ml</span>
+          </div>
+        </motion.div>
 
         {/* CTAs */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.7 }}
-          className="mt-8 flex flex-col items-center justify-center gap-3.5"
+          className="mt-8 flex flex-col items-center justify-center gap-4"
         >
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full">
-            <button
-              onClick={onChoosePerfume}
-              className="w-full sm:w-auto px-8 py-4 bg-[#C5A059] text-black hover:bg-white transition-all duration-300 rounded-none text-xs font-bold tracking-[0.2em] uppercase flex items-center justify-center gap-2.5 shadow-2xl cursor-pointer group"
-            >
-              <span>QUERO ESCOLHER MEU PERFUME</span>
-              <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
-            </button>
-
-            <button
-              onClick={onOpenWhatsApp}
-              className="w-full sm:w-auto px-8 py-4 border border-white/30 text-white hover:bg-white/10 transition-all duration-300 rounded-none text-xs font-semibold tracking-[0.2em] uppercase flex items-center justify-center gap-2 cursor-pointer backdrop-blur-xs"
-            >
-              <MessageCircle className="w-4 h-4 text-emerald-400" />
-              <span>FALAR NO WHATSAPP</span>
-            </button>
-          </div>
-
-          {/* High Visibility Trio Banner Button */}
           <button
-            onClick={() => {
-              if (onOpenTrioBuilder) onOpenTrioBuilder();
-              const el = document.getElementById('trio-bolso-builder');
-              el?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="w-full max-w-xl px-6 py-3.5 bg-gradient-to-r from-[#1E170C] via-[#2E2211] to-[#1E170C] border border-[#C5A059] hover:border-white text-white hover:text-black hover:bg-[#C5A059] transition-all duration-300 rounded-full text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-2.5 shadow-[0_10px_30px_rgba(197,160,89,0.35)] cursor-pointer group"
+            onClick={onChoosePerfume}
+            className="w-full sm:w-auto px-10 py-4 bg-white text-black hover:bg-[#C5A059] transition-all duration-300 rounded-none text-xs sm:text-sm font-bold tracking-[0.2em] uppercase flex items-center justify-center gap-3 shadow-2xl cursor-pointer group"
           >
-            <Gift className="w-4 h-4 text-[#E0C078] group-hover:text-black animate-bounce shrink-0" />
-            <span className="truncate">🎁 MONTE SEU TRIO DE BOLSO (3x 15ml) por R$ 89,90</span>
-            <Sparkles className="w-3.5 h-3.5 text-[#C5A059] group-hover:text-black shrink-0" />
+            <span>EXPLORAR FRAGRÂNCIAS</span>
+            <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+          </button>
+
+          <button
+            onClick={onOpenWhatsApp}
+            className="text-xs text-neutral-300 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer font-light tracking-wider"
+          >
+            <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Falar com um consultor via WhatsApp</span>
           </button>
         </motion.div>
 
@@ -169,34 +154,34 @@ export const Hero: React.FC<HeroProps> = ({ onChoosePerfume, onOpenWhatsApp, onO
           className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 text-left border-t border-white/10 pt-6 max-w-3xl mx-auto"
         >
           <div className="flex items-center gap-3">
-            <Sparkles className="w-5 h-5 text-[#C5A059] shrink-0" />
+            <Sparkles className="w-4 h-4 text-[#C5A059] shrink-0" />
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-white">Extrait de Parfum</p>
-              <p className="text-[11px] text-neutral-400 font-light">36% Concentração de Essência</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-white">36% Concentração</p>
+              <p className="text-[11px] text-neutral-400 font-light">Extrait de Parfum</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <ShieldCheck className="w-5 h-5 text-[#C5A059] shrink-0" />
+            <ShieldCheck className="w-4 h-4 text-[#C5A059] shrink-0" />
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-white">Fixação 8h a 12h+</p>
-              <p className="text-[11px] text-neutral-400 font-light">Comprovada na pele</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-white">Fixação Estimada</p>
+              <p className="text-[11px] text-neutral-400 font-light">8h a 12h na pele</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <Award className="w-5 h-5 text-[#C5A059] shrink-0" />
+            <Award className="w-4 h-4 text-[#C5A059] shrink-0" />
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-white">Essência Suíça</p>
-              <p className="text-[11px] text-neutral-400 font-light">Firmenich &amp; Robertet</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-white">Essências Importadas</p>
+              <p className="text-[11px] text-neutral-400 font-light">Perfumaria Internacional</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <MessageCircle className="w-5 h-5 text-[#C5A059] shrink-0" />
+            <MessageCircle className="w-4 h-4 text-[#C5A059] shrink-0" />
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-white">Nota 4.9 / 5.0</p>
-              <p className="text-[11px] text-neutral-400 font-light">+5.000 Clientes Satisfeitos</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-white">Atendimento Humano</p>
+              <p className="text-[11px] text-neutral-400 font-light">Consultoria no WhatsApp</p>
             </div>
           </div>
         </motion.div>

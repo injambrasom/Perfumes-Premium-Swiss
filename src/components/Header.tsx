@@ -10,6 +10,8 @@ interface HeaderProps {
   onOpenQuiz: () => void;
   onOpenCart: () => void;
   onOpenTrioBuilder?: () => void;
+  onOpenPolicy?: () => void;
+  onOpenWhatsApp?: () => void;
   cartCount: number;
   activeCategory: string;
   onSelectCategory: (cat: string) => void;
@@ -20,6 +22,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenQuiz,
   onOpenCart,
   onOpenTrioBuilder,
+  onOpenPolicy,
+  onOpenWhatsApp,
   cartCount,
   onSelectCategory
 }) => {
@@ -44,32 +48,60 @@ export const Header: React.FC<HeaderProps> = ({
 
   const menuItems = [
     { label: 'Início', value: 'Todos' },
-    { label: '🎁 Trio de Bolso', value: 'Trio' },
     { label: 'Masculinos', value: 'Masculino' },
     { label: 'Femininos', value: 'Feminino' },
     { label: 'Árabes', value: 'Árabe' },
     { label: 'Nicho', value: 'Nicho' },
-    { label: 'Mais Vendidos', value: 'Mais Vendidos' },
-    { label: 'Contato', value: 'Contato' }
+    { label: 'Mais Vendidos', value: 'Mais Vendidos' }
   ];
+
+  const handleWhatsAppContact = () => {
+    if (onOpenWhatsApp) {
+      onOpenWhatsApp();
+    } else {
+      const text = encodeURIComponent(
+        'PERFUMES PREMIUM SWISS ATELIER\nOlá! Gostaria de falar com um perfumista e tirar dúvidas.'
+      );
+      window.open(`https://wa.me/5554999893370?text=${text}`, '_blank');
+    }
+  };
 
   const handleNavClick = (val: string) => {
     setIsMobileMenuOpen(false);
+    
+    if (val === 'Todos' || val === 'Início') {
+      onSelectCategory('Todos');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     if (val === 'Trio') {
       if (onOpenTrioBuilder) onOpenTrioBuilder();
       const el = document.getElementById('trio-bolso-builder');
-      el?.scrollIntoView({ behavior: 'smooth' });
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        window.scrollTo({ top: 1200, behavior: 'smooth' });
+      }
       return;
     }
+
     if (val === 'Contato') {
       const el = document.getElementById('footer');
-      el?.scrollIntoView({ behavior: 'smooth' });
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      }
       return;
     }
+
     onSelectCategory(val);
     const catalogEl = document.getElementById('signature-collection');
     if (catalogEl) {
       catalogEl.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      window.scrollTo({ top: 600, behavior: 'smooth' });
     }
   };
 
@@ -116,7 +148,15 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Logo */}
         <div className="shrink-0 min-w-0">
-          <a href="#" className="inline-flex items-center gap-3 sm:gap-4 group text-left">
+          <a
+            href="#top"
+            onClick={(e) => {
+              e.preventDefault();
+              onSelectCategory('Todos');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="inline-flex items-center gap-3 sm:gap-4 group text-left cursor-pointer"
+          >
             <div className="w-14 h-14 sm:w-18 sm:h-18 xl:w-20 xl:h-20 rounded-full border-2 border-[#C5A059] overflow-hidden shrink-0 shadow-[0_0_20px_rgba(197,160,89,0.35)] p-0.5 bg-black transition-transform duration-300 group-hover:scale-105">
               <img 
                 src={LOGO_IMAGE_URL} 
@@ -163,7 +203,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Row 2: Secondary Action Bar (Three main action buttons on a dedicated second line) */}
+      {/* Row 2: Secondary Action Bar (Main action buttons) */}
       <div className="w-full bg-[#08080B]/90 border-t border-[#C5A059]/25 py-2 px-3 sm:px-6 lg:px-8">
         <div className="max-w-[1600px] mx-auto flex items-center justify-center xl:justify-end gap-2.5 sm:gap-4 flex-wrap">
           {/* Reference Search Trigger */}
@@ -184,6 +224,16 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Sparkles className="w-3.5 h-3.5 text-black shrink-0" />
             <span className="whitespace-nowrap text-xs font-bold">Quiz Olfativo</span>
+          </button>
+
+          {/* Direct WhatsApp Contact Button */}
+          <button
+            onClick={handleWhatsAppContact}
+            className="flex items-center gap-2 text-xs uppercase tracking-wider text-neutral-100 hover:text-white py-1.5 px-3.5 border border-[#C5A059]/60 hover:border-[#C5A059] bg-[#0E0E12] transition-all rounded-full font-medium shadow-md cursor-pointer hover:scale-105"
+            title="Falar no WhatsApp com Consultor Olfativo"
+          >
+            <MessageCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span className="whitespace-nowrap text-xs font-semibold">Fale com um Consultor</span>
           </button>
 
           {/* Sacola Button */}
@@ -273,7 +323,7 @@ export const Header: React.FC<HeaderProps> = ({
                       setIsMobileMenuOpen(false);
                       onOpenSearch();
                     }}
-                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-neutral-100 text-neutral-900 rounded-lg text-xs font-medium uppercase tracking-wider"
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-neutral-100 text-neutral-900 rounded-lg text-xs font-medium uppercase tracking-wider cursor-pointer"
                   >
                     <Search className="w-4 h-4 text-[#C5A059]" />
                     <span>Buscar Perfume Equivalente</span>
@@ -284,11 +334,23 @@ export const Header: React.FC<HeaderProps> = ({
                       setIsMobileMenuOpen(false);
                       onOpenQuiz();
                     }}
-                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-neutral-950 text-white rounded-lg text-xs font-medium uppercase tracking-wider"
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-neutral-950 text-white rounded-lg text-xs font-medium uppercase tracking-wider cursor-pointer"
                   >
                     <Sparkles className="w-4 h-4 text-[#C5A059]" />
                     <span>Descubra Seu Perfume Ideal (Quiz)</span>
                   </button>
+
+                  {onOpenPolicy && (
+                    <button
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        onOpenPolicy();
+                      }}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs font-semibold uppercase tracking-wider cursor-pointer"
+                    >
+                      <span>📜 Política de Compras SWISS ATELIER</span>
+                    </button>
+                  )}
                 </div>
               </div>
 

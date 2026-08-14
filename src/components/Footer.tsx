@@ -6,9 +6,10 @@ interface FooterProps {
   onOpenSearch: () => void;
   onOpenQuiz: () => void;
   onSelectCategory: (cat: string) => void;
+  onOpenPolicy?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onOpenSearch, onOpenQuiz, onSelectCategory }) => {
+export const Footer: React.FC<FooterProps> = ({ onOpenSearch, onOpenQuiz, onSelectCategory, onOpenPolicy }) => {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -77,19 +78,26 @@ export const Footer: React.FC<FooterProps> = ({ onOpenSearch, onOpenQuiz, onSele
           {/* Col 3: Ferramentas & Atendimento */}
           <div className="space-y-3">
             <h4 className="font-serif text-sm font-semibold uppercase tracking-widest text-[#C5A059]">
-              Consultoria
+              Consultoria & Institucional
             </h4>
             <ul className="space-y-2 text-xs font-light text-neutral-400">
               <li>
-                <button onClick={onOpenSearch} className="hover:text-white transition-colors flex items-center gap-1">
+                <button onClick={onOpenSearch} className="hover:text-white transition-colors flex items-center gap-1 cursor-pointer">
                   <span>Busca por Referência</span>
                 </button>
               </li>
               <li>
-                <button onClick={onOpenQuiz} className="hover:text-white transition-colors flex items-center gap-1">
+                <button onClick={onOpenQuiz} className="hover:text-white transition-colors flex items-center gap-1 cursor-pointer">
                   <span>Quiz Olfativo Personalizado</span>
                 </button>
               </li>
+              {onOpenPolicy && (
+                <li>
+                  <button onClick={onOpenPolicy} className="hover:text-[#C5A059] transition-colors flex items-center gap-1 font-medium text-neutral-300 cursor-pointer">
+                    <span>📜 Política de Compras</span>
+                  </button>
+                </li>
+              )}
               <li>
                 <a
                   href={`https://wa.me/5554999893370?text=${encodeURIComponent(
@@ -148,11 +156,24 @@ export const Footer: React.FC<FooterProps> = ({ onOpenSearch, onOpenQuiz, onSele
 
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-[11px] font-mono text-neutral-500 gap-4">
-          <p>© {new Date().getFullYear()} PERFUMES PREMIUM SWISS ATELIER. Todos os direitos reservados.</p>
+          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
+            <p>© {new Date().getFullYear()} PERFUMES PREMIUM SWISS ATELIER.</p>
+            {onOpenPolicy && (
+              <>
+                <span className="hidden sm:inline text-neutral-700">•</span>
+                <button
+                  onClick={onOpenPolicy}
+                  className="hover:text-[#C5A059] transition-colors underline decoration-neutral-700 underline-offset-4 cursor-pointer"
+                >
+                  Política de Compras
+                </button>
+              </>
+            )}
+          </div>
           
           <button
             onClick={scrollToTop}
-            className="flex items-center gap-2 hover:text-white transition-colors uppercase tracking-widest"
+            className="flex items-center gap-2 hover:text-white transition-colors uppercase tracking-widest cursor-pointer"
           >
             <span>Voltar ao Topo</span>
             <ArrowUp className="w-3.5 h-3.5 text-[#C5A059]" />

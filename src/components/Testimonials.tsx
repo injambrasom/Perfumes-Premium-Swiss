@@ -8,6 +8,12 @@ export const Testimonials: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<RealFeedbackPrint | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [isZoomed, setIsZoomed] = useState<boolean>(false);
+  const [visibleCount, setVisibleCount] = useState<number>(8);
+  const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({});
+
+  const handleImageLoad = (id: string) => {
+    setLoadedImages((prev) => ({ ...prev, [id]: true }));
+  };
 
   const openLightbox = (item: RealFeedbackPrint, index: number) => {
     setSelectedImage(item);
@@ -75,70 +81,99 @@ export const Testimonials: React.FC = () => {
 
         {/* Real Feedback Screenshots Grid / Empty State */}
         {REAL_FEEDBACK_PRINTS.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {REAL_FEEDBACK_PRINTS.map((item, idx) => (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: idx * 0.03 }}
-                onClick={() => openLightbox(item, idx)}
-                className="group cursor-pointer bg-neutral-900/90 border border-neutral-800 hover:border-[#C5A059] shadow-xl hover:shadow-[0_0_25px_rgba(197,160,89,0.3)] transition-all duration-300 overflow-hidden flex flex-col justify-between rounded-lg backdrop-blur-md"
-              >
-                {/* Image Container with Zoom overlay */}
-                <div className="relative aspect-[3/4] bg-black overflow-hidden flex items-center justify-center p-1.5">
-                  <img 
-                    src={item.image}
-                    alt={item.title}
-                    loading="lazy"
-                    style={{ 
-                      filter: 'contrast(1.18) brightness(1.08)',
-                      WebkitFilter: 'contrast(1.18) brightness(1.08)'
-                    }}
-                    className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500 rounded-sm"
-                    onError={(e) => {
-                      const target = e.currentTarget;
-                      if (item.fallbackUrl && target.src !== item.fallbackUrl) {
-                        target.src = item.fallbackUrl;
-                      }
-                    }}
-                  />
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {REAL_FEEDBACK_PRINTS.slice(0, visibleCount).map((item, idx) => (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.3, delay: Math.min(idx * 0.02, 0.2) }}
+                  onClick={() => openLightbox(item, idx)}
+                  className="group cursor-pointer bg-neutral-900/90 border border-neutral-800 hover:border-[#C5A059] shadow-xl hover:shadow-[0_0_25px_rgba(197,160,89,0.3)] transition-all duration-300 overflow-hidden flex flex-col justify-between rounded-lg backdrop-blur-md"
+                >
+                  {/* Image Container with Zoom overlay */}
+                  <div className="relative aspect-[3/4] bg-neutral-950 overflow-hidden flex items-center justify-center p-1.5">
+                    
+                    {/* Shimmer Skeleton Placeholder */}
+                    {!loadedImages[item.id] && (
+                      <div className="absolute inset-0 bg-neutral-900 animate-pulse flex flex-col items-center justify-center p-4">
+                        <div className="w-7 h-7 rounded-full border-2 border-[#C5A059]/40 border-t-[#C5A059] animate-spin mb-2" />
+                        <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">Carregando HD...</span>
+                      </div>
+                    )}
 
-                  {/* Hover overlay with Zoom Icon */}
-                  <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-3 text-white p-4 text-center">
-                    <div className="p-3.5 bg-[#C5A059] text-black rounded-full shadow-2xl transform group-hover:scale-110 transition-transform">
-                      <Maximize2 className="w-6 h-6" />
+                    <img 
+                      src={item.image}
+                      alt={item.title}
+                      loading="lazy"
+                      decoding="async"
+                      onLoad={() => handleImageLoad(item.id)}
+                      style={{ 
+                        filter: 'contrast(1.18) brightness(1.08)',
+                        WebkitFilter: 'contrast(1.18) brightness(1.08)'
+                      }}
+                      className={`w-full h-full object-cover object-top group-hover:scale-105 transition-all duration-500 rounded-sm ${
+                        loadedImages[item.id] ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (item.fallbackUrl && target.src !== item.fallbackUrl) {
+                          target.src = item.fallbackUrl;
+                        }
+                        handleImageLoad(item.id);
+                      }}
+                    />
+
+                    {/* Hover overlay with Zoom Icon */}
+                    <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-3 text-white p-4 text-center">
+                      <div className="p-3.5 bg-[#C5A059] text-black rounded-full shadow-2xl transform group-hover:scale-110 transition-transform">
+                        <Maximize2 className="w-6 h-6" />
+                      </div>
+                      <span className="text-xs font-mono font-bold uppercase tracking-wider bg-black/90 px-3 py-1.5 border border-[#C5A059]/60 text-[#E0C078] rounded-xs">
+                        Ampliar e Ler Print
+                      </span>
                     </div>
-                    <span className="text-xs font-mono font-bold uppercase tracking-wider bg-black/90 px-3 py-1.5 border border-[#C5A059]/60 text-[#E0C078] rounded-xs">
-                      Ampliar e Ler Print
-                    </span>
+
+                    {/* Tag Badge */}
+                    <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 bg-emerald-950/95 text-emerald-400 text-[10px] font-mono font-bold px-2.5 py-1 border border-emerald-700/80 shadow-md rounded-xs">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{item.tag}</span>
+                    </div>
                   </div>
 
-                  {/* Tag Badge */}
-                  <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 bg-emerald-950/95 text-emerald-400 text-[10px] font-mono font-bold px-2.5 py-1 border border-emerald-700/80 shadow-md rounded-xs">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>{item.tag}</span>
+                  {/* Card Footer */}
+                  <div className="p-3.5 bg-neutral-950 border-t border-neutral-800 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <h4 className="font-serif text-xs font-bold text-neutral-100 group-hover:text-[#C5A059] transition-colors truncate">
+                        {item.title}
+                      </h4>
+                      <span className="text-[10px] font-mono text-neutral-400 flex items-center gap-1 mt-0.5">
+                        <MessageCircle className="w-3 h-3 text-emerald-500 shrink-0" /> WhatsApp Verificado
+                      </span>
+                    </div>
+                    <div className="text-neutral-400 group-hover:text-[#C5A059] transition-colors shrink-0 p-1">
+                      <ZoomIn className="w-4 h-4" />
+                    </div>
                   </div>
-                </div>
+                </motion.div>
+              ))}
+            </div>
 
-                {/* Card Footer */}
-                <div className="p-3.5 bg-neutral-950 border-t border-neutral-800 flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <h4 className="font-serif text-xs font-bold text-neutral-100 group-hover:text-[#C5A059] transition-colors truncate">
-                      {item.title}
-                    </h4>
-                    <span className="text-[10px] font-mono text-neutral-400 flex items-center gap-1 mt-0.5">
-                      <MessageCircle className="w-3 h-3 text-emerald-500 shrink-0" /> WhatsApp Verificado
-                    </span>
-                  </div>
-                  <div className="text-neutral-400 group-hover:text-[#C5A059] transition-colors shrink-0 p-1">
-                    <ZoomIn className="w-4 h-4" />
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+            {/* Show More Button if remaining prints exist */}
+            {visibleCount < REAL_FEEDBACK_PRINTS.length && (
+              <div className="mt-10 text-center">
+                <button
+                  onClick={() => setVisibleCount(REAL_FEEDBACK_PRINTS.length)}
+                  className="px-8 py-3.5 bg-neutral-900 hover:bg-neutral-800 border border-[#C5A059]/60 hover:border-[#C5A059] text-[#E0C078] font-mono text-xs uppercase tracking-wider font-bold rounded-lg shadow-lg transition-all cursor-pointer inline-flex items-center gap-2"
+                >
+                  <MessageCircle className="w-4 h-4 text-emerald-400" />
+                  <span>Carregar Todos os Prints do WhatsApp ({REAL_FEEDBACK_PRINTS.length - visibleCount} restantes)</span>
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="p-12 text-center bg-neutral-900/60 border border-dashed border-[#C5A059]/40 rounded-xl max-w-2xl mx-auto backdrop-blur-md">
             <MessageCircle className="w-12 h-12 text-[#C5A059] mx-auto mb-4 opacity-80" />

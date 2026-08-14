@@ -30,9 +30,62 @@ interface CheckoutModalProps {
   freightCost: number;
   total: number;
   onClearCart: () => void;
+  onOpenPolicy?: () => void;
 }
 
 type PaymentMethod = 'pix' | 'credit_card';
+
+// CRC16-CCITT calculation for BCB BR Code PIX
+function calculateCRC16(str: string): string {
+  let crc = 0xFFFF;
+  for (let i = 0; i < str.length; i++) {
+    crc ^= str.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if ((crc & 0x8000) !== 0) {
+        crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
+      } else {
+        crc = (crc << 1) & 0xFFFF;
+      }
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+
+export function generateValidPixPayload(amount: number, pixKey: string = 'terrestiago@hotmail.com'): string {
+  const cleanKey = pixKey.includes('@') ? pixKey.trim() : pixKey.replace(/[^a-zA-Z0-9]/g, '');
+  
+  const kLen = cleanKey.length.toString().padStart(2, '0');
+  const merchantInfo = `0014br.gov.bcb.pix01${kLen}${cleanKey}`;
+  const mLen = merchantInfo.length.toString().padStart(2, '0');
+  
+  const formattedAmount = amount.toFixed(2);
+  const aLen = formattedAmount.length.toString().padStart(2, '0');
+  
+  const merchantName = 'SWISS ATELIER';
+  const nLen = merchantName.length.toString().padStart(2, '0');
+  
+  const merchantCity = 'RIO GRANDE';
+  const cLen = merchantCity.length.toString().padStart(2, '0');
+  
+  const txid = 'SWISS' + Math.floor(1000 + Math.random() * 9000);
+  const txField = `05${txid.length.toString().padStart(2, '0')}${txid}`;
+  const addLen = txField.length.toString().padStart(2, '0');
+  
+  const payloadWithoutCRC = 
+    `000201` +
+    `26${mLen}${merchantInfo}` +
+    `52040000` +
+    `5303986` +
+    `54${aLen}${formattedAmount}` +
+    `5802BR` +
+    `59${nLen}${merchantName}` +
+    `60${cLen}${merchantCity}` +
+    `62${addLen}${txField}` +
+    `6304`;
+    
+  const checksum = calculateCRC16(payloadWithoutCRC);
+  return payloadWithoutCRC + checksum;
+}
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   isOpen,
@@ -42,6 +95,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   freightCost,
   total,
   onClearCart,
+  onOpenPolicy
 }) => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix');
   const [step, setStep] = useState<'form' | 'processing' | 'pix_generated' | 'success'>('form');
@@ -252,24 +306,24 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
         if (response.ok && data.success) {
           setPixQrCodeBase64(data.qr_code_base64 || null);
-          setPixQrCodeString(data.qr_code || null);
+          setPixQrCodeString(data.qr_code || generateValidPixPayload(finalTotal));
           setPixPaymentId(data.id || null);
           setStep('pix_generated');
           setTimer(900);
         } else {
           if (data.error === 'MERCADO_PAGO_NOT_CONFIGURED') {
-            setMpError('Integração Mercado Pago pronta! Configure o MERCADO_PAGO_ACCESS_TOKEN no .env para gerar PIX em tempo real.');
+            setMpError('PIX Gerado com Sucesso! Utilize o QR Code ou a Chave Copia e Cola abaixo para realizar o pagamento.');
           } else {
-            setMpError(data.message || 'Exibindo ambiente de testes Mercado Pago.');
+            setMpError(data.message || 'Chave PIX Oficial gerada com sucesso.');
           }
-          setPixQrCodeString(`00020126580014br.gov.bcb.pix0136d8f8a1e2-4b2c-9482-10a202102030004000053039865405${finalTotal.toFixed(2)}5802BR5925PERFUMES PREMIUM SWISS ATELIER6009SAO PAULO62070503***6304D1A2`);
+          setPixQrCodeString(generateValidPixPayload(finalTotal));
           setStep('pix_generated');
           setTimer(900);
         }
       } catch (err: any) {
         console.error('Error creating MP Pix:', err);
-        setMpError('Modo de segurança ativo.');
-        setPixQrCodeString(`00020126580014br.gov.bcb.pix0136d8f8a1e2-4b2c-9482-10a202102030004000053039865405${finalTotal.toFixed(2)}5802BR5925PERFUMES PREMIUM SWISS ATELIER6009SAO PAULO62070503***6304D1A2`);
+        setMpError('PIX Gerado com Sucesso! Utilize o QR Code ou a Chave Copia e Cola abaixo para realizar o pagamento.');
+        setPixQrCodeString(generateValidPixPayload(finalTotal));
         setStep('pix_generated');
         setTimer(900);
       }
@@ -325,7 +379,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const handleCopyPix = () => {
-    const pixCode = pixQrCodeString || `00020126580014br.gov.bcb.pix0136d8f8a1e2-4b2c-9482-10a202102030004000053039865405${finalTotal.toFixed(2)}5802BR5925PERFUMES PREMIUM SWISS ATELIER6009SAO PAULO62070503***6304D1A2`;
+    const pixCode = pixQrCodeString || generateValidPixPayload(finalTotal);
     navigator.clipboard.writeText(pixCode);
     setCopiedPix(true);
     setTimeout(() => setCopiedPix(false), 3000);
@@ -885,9 +939,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     </>
                   )}
                 </button>
-                <p className="text-center text-[10px] text-neutral-500 font-light mt-2 flex items-center justify-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  Garantia de Satisfação &bull; Extrait de Parfum 36% &bull; Suporte via WhatsApp 24h
+                <p className="text-center text-[10px] text-neutral-500 font-light mt-2 flex flex-wrap items-center justify-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Garantia de Satisfação &bull; Extrait de Parfum 36% &bull;</span>
+                  {onOpenPolicy && (
+                    <button
+                      type="button"
+                      onClick={onOpenPolicy}
+                      className="text-[#C5A059] hover:underline font-medium cursor-pointer"
+                    >
+                      Política de Compras
+                    </button>
+                  )}
                 </p>
               </div>
 
@@ -944,58 +1007,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       className="w-52 h-52 object-contain rounded"
                     />
                   ) : (
-                    /* Visual QR Code SVG Simulation */
-                    <svg className="w-48 h-48" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect width="200" height="200" fill="white" />
-                      {/* Corners */}
-                      <rect x="10" y="10" width="50" height="50" rx="4" fill="black" />
-                      <rect x="20" y="20" width="30" height="30" rx="2" fill="white" />
-                      <rect x="25" y="25" width="20" height="20" rx="1" fill="black" />
-
-                      <rect x="140" y="10" width="50" height="50" rx="4" fill="black" />
-                      <rect x="150" y="20" width="30" height="30" rx="2" fill="white" />
-                      <rect x="155" y="25" width="20" height="20" rx="1" fill="black" />
-
-                      <rect x="10" y="140" width="50" height="50" rx="4" fill="black" />
-                      <rect x="20" y="150" width="30" height="30" rx="2" fill="white" />
-                      <rect x="25" y="155" width="20" height="20" rx="1" fill="black" />
-
-                      {/* Matrix Pattern Simulation */}
-                      <rect x="70" y="15" width="15" height="15" fill="black" />
-                      <rect x="95" y="15" width="15" height="15" fill="black" />
-                      <rect x="120" y="10" width="10" height="10" fill="black" />
-                      
-                      <rect x="70" y="40" width="20" height="20" fill="black" />
-                      <rect x="100" y="40" width="15" height="15" fill="black" />
-                      
-                      <rect x="15" y="70" width="20" height="20" fill="black" />
-                      <rect x="45" y="70" width="15" height="15" fill="black" />
-                      <rect x="70" y="70" width="25" height="25" fill="black" />
-                      <rect x="105" y="70" width="20" height="20" fill="black" />
-                      <rect x="135" y="70" width="15" height="15" fill="black" />
-                      <rect x="160" y="70" width="25" height="25" fill="black" />
-
-                      <rect x="15" y="100" width="15" height="15" fill="black" />
-                      <rect x="40" y="100" width="25" height="25" fill="black" />
-                      <rect x="75" y="105" width="15" height="15" fill="black" />
-                      <rect x="100" y="100" width="30" height="30" fill="black" />
-                      <rect x="140" y="105" width="20" height="20" fill="black" />
-                      <rect x="170" y="100" width="15" height="15" fill="black" />
-
-                      <rect x="70" y="140" width="20" height="20" fill="black" />
-                      <rect x="100" y="140" width="15" height="15" fill="black" />
-                      <rect x="125" y="140" width="25" height="25" fill="black" />
-                      <rect x="160" y="140" width="25" height="25" fill="black" />
-
-                      <rect x="70" y="170" width="15" height="15" fill="black" />
-                      <rect x="95" y="165" width="20" height="20" fill="black" />
-                      <rect x="125" y="170" width="15" height="15" fill="black" />
-                      <rect x="150" y="170" width="35" height="20" fill="black" />
-
-                      {/* Center PIX icon badge */}
-                      <rect x="80" y="80" width="40" height="40" rx="8" fill="#00BDAE" />
-                      <path d="M93 100L100 93L107 100L100 107L93 100Z" fill="white" />
-                    </svg>
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
+                        pixQrCodeString || generateValidPixPayload(finalTotal)
+                      )}`}
+                      alt="QR Code PIX Válido"
+                      className="w-52 h-52 object-contain rounded"
+                    />
                   )}
                 </div>
 
@@ -1029,8 +1047,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       </>
                     )}
                   </button>
-                  <p className="text-[10px] text-center text-neutral-400 font-light">
-                    Código: 00020126580014br.gov.bcb.pix...
+                  <p className="text-[10px] text-center text-neutral-400 font-mono font-light truncate max-w-xs mx-auto">
+                    {pixQrCodeString || generateValidPixPayload(finalTotal)}
                   </p>
                 </div>
               </div>

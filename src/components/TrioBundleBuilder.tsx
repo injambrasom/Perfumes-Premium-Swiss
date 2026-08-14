@@ -126,17 +126,17 @@ export const TrioBundleBuilder: React.FC<TrioBundleBuilderProps> = ({
 
       {/* Main Builder Header */}
       <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-10">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#C5A059]/15 border border-[#C5A059]/40 text-[#E0C078] text-[10px] sm:text-xs font-mono uppercase tracking-[0.25em] mb-3 shadow-sm">
-          <Gift className="w-3.5 h-3.5 text-[#C5A059]" />
-          <span>OFERTA EXCLUSIVA • 3X 15ML (45ML TOTAL)</span>
+        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/5 border border-[#C5A059]/40 text-[#E0C078] text-[10px] sm:text-xs font-mono uppercase tracking-[0.25em] mb-3 shadow-sm">
+          <Sparkles className="w-3.5 h-3.5 text-[#C5A059]" />
+          <span>EXPERIMENTE MAIS DE UMA FRAGRÂNCIA</span>
         </div>
 
         <h2 className="font-serif text-2xl sm:text-4xl font-normal tracking-tight text-white">
-          Monte Seu Trio de Bolso (3x 15ml)
+          3 fragrâncias de 15ml por R$ 89,90
         </h2>
 
         <p className="mt-2 text-xs sm:text-sm text-neutral-300 font-light max-w-xl mx-auto leading-relaxed">
-          Escolha 3 fragrâncias de bolso de 15ml (36% de essência pura) do Ateliê por apenas <strong className="text-[#E0C078] font-semibold">R$ 89,90</strong> (3x de R$ 29,96).
+          Monte sua seleção com 3 essências de 15ml (36% de concentração) para explorar novas notas e variar sua assinatura olfativa no dia a dia.
         </p>
       </div>
 

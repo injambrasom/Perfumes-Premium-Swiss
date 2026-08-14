@@ -17,6 +17,7 @@ import { InstagramGallery } from './components/InstagramGallery';
 import { ProductDetailModal } from './components/ProductDetailModal';
 import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './components/CheckoutModal';
+import { PurchasingPolicyModal } from './components/PurchasingPolicyModal';
 import { FloatingWhatsapp } from './components/FloatingWhatsapp';
 import { PRODUCTS } from './data/products';
 import { FragranceProduct, CartItem, BottleSize } from './types';
@@ -30,6 +31,7 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isTrioModalOpen, setIsTrioModalOpen] = useState(false);
+  const [isPolicyOpen, setIsPolicyOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<FragranceProduct | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [lastSyncInfo, setLastSyncInfo] = useState<{
@@ -179,26 +181,28 @@ export default function App() {
 
       <div className="relative z-10 w-full max-w-full overflow-x-hidden">
         {/* Header Navigation */}
-      <Header
-        onOpenSearch={() => setIsSearchOpen(true)}
-        onOpenQuiz={() => setIsQuizOpen(true)}
-        onOpenCart={() => setIsCartOpen(true)}
-        onOpenTrioBuilder={() => setIsTrioModalOpen(true)}
-        cartCount={cartItems.reduce((acc, curr) => acc + curr.quantity, 0)}
-        activeCategory={activeCategory}
-        onSelectCategory={setActiveCategory}
-      />
+        <Header
+          onOpenSearch={() => setIsSearchOpen(true)}
+          onOpenQuiz={() => setIsQuizOpen(true)}
+          onOpenCart={() => setIsCartOpen(true)}
+          onOpenTrioBuilder={() => setIsTrioModalOpen(true)}
+          onOpenPolicy={() => setIsPolicyOpen(true)}
+          onOpenWhatsApp={handleWhatsAppDirect}
+          cartCount={cartItems.reduce((acc, curr) => acc + curr.quantity, 0)}
+          activeCategory={activeCategory}
+          onSelectCategory={setActiveCategory}
+        />
 
       {/* Main Content */}
       <main className="w-full max-w-full overflow-x-hidden">
-        {/* Hero Section */}
+        {/* 1. Hero Section */}
         <Hero
           onChoosePerfume={handleChoosePerfumeScroll}
           onOpenWhatsApp={handleWhatsAppDirect}
           onOpenTrioBuilder={() => setIsTrioModalOpen(true)}
         />
 
-        {/* Section: Signature Collection & Mais Vendidos */}
+        {/* 2. Destaques & Catálogo Principal */}
         <SignatureCollection
           products={products}
           activeCategory={activeCategory}
@@ -208,29 +212,74 @@ export default function App() {
           onOpenTrioBuilder={() => setIsTrioModalOpen(true)}
         />
 
-        {/* Section: Origem das Essências (Firmenich & Robertet) */}
-        <EssenceOrigin onExploreCollection={handleChoosePerfumeScroll} />
+        {/* 3. Trio de Bolso (3x 15ml por R$ 89,90) */}
+        <div id="trio-bolso-builder" className="py-12 bg-[#08080C] border-y border-white/10">
+          <TrioBundleBuilder
+            products={products}
+            onAddToCart={handleAddToCart}
+          />
+        </div>
 
-        {/* Section: Por Que Escolher a Premium Swiss? + Diferenciais */}
-        <WhySwiss />
-
-        {/* Section: Categorias Em Grandes Cards */}
+        {/* 4. Categorias em Destaque */}
         <CategoryShowcase onSelectCategory={setActiveCategory} />
 
-        {/* Section: Experiência Olfativa (Emotional Lifestyle Story) */}
-        <OlfactoryExperience />
+        {/* 5. Por Que Perfumes Premium Swiss? */}
+        <WhySwiss />
 
-        {/* Section: Monte Seu Trio de Bolso */}
-        <TrioBundleBuilder
-          products={products}
-          onAddToCart={handleAddToCart}
-        />
+        {/* 6. Quiz Olfativo Banner */}
+        <section className="py-16 bg-gradient-to-r from-black via-[#121218] to-black text-white border-y border-white/10 text-center px-4">
+          <div className="max-w-3xl mx-auto space-y-4">
+            <span className="text-[11px] font-mono uppercase tracking-[0.3em] text-[#C5A059]">
+              DESCUBRA SUA ASSINATURA OLFATIVA
+            </span>
+            <h2 className="font-serif text-2xl sm:text-4xl font-normal">
+              Qual perfume combina com você?
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-300 font-light max-w-xl mx-auto leading-relaxed">
+              Responda algumas perguntas e descubra as fragrâncias que mais combinam com o seu estilo e personalidade.
+            </p>
+            <div className="pt-2">
+              <button
+                onClick={() => setIsQuizOpen(true)}
+                className="px-8 py-3.5 bg-white text-black hover:bg-[#C5A059] transition-all duration-300 text-xs font-bold uppercase tracking-wider cursor-pointer shadow-lg inline-flex items-center gap-2"
+              >
+                <span>FAZER O QUIZ OLFATIVO</span>
+              </button>
+            </div>
+          </div>
+        </section>
 
-        {/* Section: Depoimentos Reais (Apple Style) */}
+        {/* 7. Origem & Transparência */}
+        <EssenceOrigin onExploreCollection={handleChoosePerfumeScroll} />
+
+        {/* 8. Avaliações e Clientes Satisfeitos */}
         <Testimonials />
 
-        {/* Section: Instagram Editorial Gallery */}
-        <InstagramGallery />
+        {/* 9. CTA Final de Fechamento */}
+        <section className="py-20 bg-black text-white text-center border-t border-white/10 px-4">
+          <div className="max-w-2xl mx-auto space-y-5">
+            <h2 className="font-serif text-2xl sm:text-4xl font-normal">
+              ENCONTRE SUA PRÓXIMA FRAGRÂNCIA
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-300 font-light">
+              Essências importadas, 36% de concentração Extrait de Parfum e consultoria olfativa via WhatsApp.
+            </p>
+            <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <button
+                onClick={handleChoosePerfumeScroll}
+                className="w-full sm:w-auto px-10 py-4 bg-white text-black hover:bg-[#C5A059] transition-all text-xs font-bold uppercase tracking-[0.2em] cursor-pointer"
+              >
+                EXPLORAR FRAGRÂNCIAS
+              </button>
+              <button
+                onClick={handleWhatsAppDirect}
+                className="w-full sm:w-auto px-8 py-4 border border-white/30 text-white hover:bg-white/10 transition-all text-xs font-semibold uppercase tracking-[0.2em] cursor-pointer"
+              >
+                FALE COM UM CONSULTOR
+              </button>
+            </div>
+          </div>
+        </section>
       </main>
 
       {/* Footer */}
@@ -292,7 +341,7 @@ export default function App() {
 
             <div className="space-y-3">
               <h4 className="font-serif text-sm font-semibold uppercase tracking-widest text-[#C5A059]">
-                Consultoria
+                Consultoria &amp; Institucional
               </h4>
               <ul className="space-y-2 text-xs font-light text-neutral-400">
                 <li>
@@ -303,6 +352,11 @@ export default function App() {
                 <li>
                   <button onClick={() => setIsQuizOpen(true)} className="hover:text-white transition-colors flex items-center gap-1 cursor-pointer">
                     <span>Quiz Olfativo Personalizado</span>
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => setIsPolicyOpen(true)} className="hover:text-[#C5A059] transition-colors flex items-center gap-1 font-medium text-neutral-300 cursor-pointer">
+                    <span>📜 Política de Compras</span>
                   </button>
                 </li>
                 <li>
@@ -361,7 +415,15 @@ export default function App() {
           </div>
 
           <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-[11px] font-mono text-neutral-500 gap-4">
-            <p>© {new Date().getFullYear()} PERFUMES PREMIUM SWISS ATELIER. Todos os direitos reservados.</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <p>© {new Date().getFullYear()} PERFUMES PREMIUM SWISS ATELIER.</p>
+              <button
+                onClick={() => setIsPolicyOpen(true)}
+                className="hover:text-[#C5A059] transition-colors underline decoration-neutral-700 underline-offset-4 cursor-pointer"
+              >
+                Política de Compras
+              </button>
+            </div>
             <button
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
               className="text-[#C5A059] hover:text-white transition-colors uppercase tracking-widest cursor-pointer"
@@ -372,14 +434,6 @@ export default function App() {
 
         </div>
       </footer>
-
-      {/* Live Inventory Sync Status Badge */}
-      <div className="fixed bottom-4 left-4 z-40 hidden sm:flex items-center gap-2 px-3 py-1.5 bg-black/90 border border-[#C5A059]/50 text-white rounded-full text-[10px] font-mono shadow-xl backdrop-blur-md">
-        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
-        <span className="text-neutral-300">
-          Sync Estoque: {lastSyncInfo ? `${lastSyncInfo.productName} às ${lastSyncInfo.timestamp}` : 'Ativo e Conectado ao App de Estoque'}
-        </span>
-      </div>
 
       {/* Modals & Drawers */}
       <ReferenceSearchModal
@@ -436,6 +490,12 @@ export default function App() {
         freightCost={0}
         total={cartItems.reduce((acc, curr) => acc + (curr.selectedPrice || curr.product.price) * curr.quantity, 0)}
         onClearCart={handleClearCart}
+        onOpenPolicy={() => setIsPolicyOpen(true)}
+      />
+
+      <PurchasingPolicyModal
+        isOpen={isPolicyOpen}
+        onClose={() => setIsPolicyOpen(false)}
       />
 
       {/* Floating WhatsApp Action Button */}

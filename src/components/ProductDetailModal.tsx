@@ -208,11 +208,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                           >
                             {isOutOfStock ? 'ESGOTADO' : `R$ ${opt.price.toFixed(2)}`}
                           </span>
-                          {!isOutOfStock && (
-                            <span className="text-[10px] text-[#E0C078] font-mono block mt-1 font-bold">
-                              {stockCount} em estoque
-                            </span>
-                          )}
                         </button>
                       );
                     })}
@@ -223,16 +218,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <div className="mt-5 p-4 bg-[#111116]/90 border border-white/10 space-y-2.5 text-xs rounded-lg backdrop-blur-md">
                   <div className="flex justify-between items-center border-b border-white/10 pb-2">
                     <span className="text-neutral-400 font-light">Concentração:</span>
-                    <span className="font-bold text-[#E0C078]">36% de Essência Pura (Extrait de Parfum)</span>
+                    <span className="font-semibold text-white">36% de concentração • Alta concentração</span>
                   </div>
                   <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                    <span className="text-neutral-400 font-light">Fixação Média:</span>
-                    <span className="font-semibold text-white">{product.fixationHours || '10h a 14h na pele'}</span>
+                    <span className="text-neutral-400 font-light">Fixação Estimada:</span>
+                    <span className="font-semibold text-white">{product.fixationHours || '8h a 12h na pele'}</span>
                   </div>
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center pb-1">
                     <span className="text-neutral-400 font-light">Projeção:</span>
-                    <span className="font-semibold text-white">{product.projectionMeter || 'Alta Projeção'}</span>
+                    <span className="font-semibold text-white">{product.projectionMeter || 'Envolvente'}</span>
                   </div>
+                  <p className="text-[10px] text-neutral-400 italic pt-1 border-t border-white/5 font-light">
+                    * O desempenho pode variar conforme pele, clima, aplicação e fragrância.
+                  </p>
                 </div>
 
                 {/* Ideal Occasions Section */}
