@@ -417,6 +417,7 @@ export default function App() {
           <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-[11px] font-mono text-neutral-500 gap-4">
             <div className="flex flex-wrap items-center gap-3">
               <p>© {new Date().getFullYear()} PERFUMES PREMIUM SWISS ATELIER.</p>
+              <span className="text-neutral-700 hidden sm:inline">•</span>
               <button
                 onClick={() => setIsPolicyOpen(true)}
                 className="hover:text-[#C5A059] transition-colors underline decoration-neutral-700 underline-offset-4 cursor-pointer"
@@ -426,7 +427,7 @@ export default function App() {
             </div>
             <button
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              className="text-[#C5A059] hover:text-white transition-colors uppercase tracking-widest cursor-pointer"
+              className="text-[#C5A059] hover:text-white transition-colors uppercase tracking-widest cursor-pointer sm:pr-60 md:pr-64"
             >
               Voltar ao Topo ↑
             </button>
