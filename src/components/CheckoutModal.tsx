@@ -51,7 +51,7 @@ function calculateCRC16(str: string): string {
   return crc.toString(16).toUpperCase().padStart(4, '0');
 }
 
-export function generateValidPixPayload(amount: number, pixKey: string = 'terrestiago@hotmail.com'): string {
+export function generateValidPixPayload(amount: number, pixKey: string = 'injambrasom38@gmail.com'): string {
   const cleanKey = pixKey.includes('@') ? pixKey.trim() : pixKey.replace(/[^a-zA-Z0-9]/g, '');
   
   const kLen = cleanKey.length.toString().padStart(2, '0');
