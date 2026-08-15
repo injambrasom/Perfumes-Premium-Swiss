@@ -51,9 +51,13 @@ function calculateCRC16(str: string): string {
   return crc.toString(16).toUpperCase().padStart(4, '0');
 }
 
-export function generateValidPixPayload(amount: number, pixKey: string = 'injambrasom38@gmail.com'): string {
-  const cleanKey = pixKey.includes('@') ? pixKey.trim() : pixKey.replace(/[^a-zA-Z0-9]/g, '');
-  
+export function generateValidPixPayload(amount: number, pixKey: string = 'c10992f7-0709-4e93-b05d-0e870153fdb1'): string {
+  let cleanKey = pixKey.trim();
+  // Only remove non-digits if it's purely digits/formatting (CPF/CNPJ/Phone)
+  if (/^[\d\s.\/-]+$/.test(cleanKey)) {
+    cleanKey = cleanKey.replace(/\D/g, '');
+  }
+
   const kLen = cleanKey.length.toString().padStart(2, '0');
   const merchantInfo = `0014br.gov.bcb.pix01${kLen}${cleanKey}`;
   const mLen = merchantInfo.length.toString().padStart(2, '0');
