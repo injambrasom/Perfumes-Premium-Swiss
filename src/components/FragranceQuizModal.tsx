@@ -29,17 +29,56 @@ export const FragranceQuizModal: React.FC<FragranceQuizModalProps> = ({
     setSelectedFamily('Todas');
   };
 
-  // Calculate matches
-  const recommendations = PRODUCTS.filter((p) => {
-    if (!p) return false;
-    let matchCount = 0;
-    if (selectedGender !== 'Todos' && (p.category === selectedGender || p.category === 'Nicho')) matchCount++;
-    if (selectedOccasion !== 'Todas' && Array.isArray(p.occasions) && p.occasions.includes(selectedOccasion as PerfumeOccasion)) matchCount++;
-    if (selectedFamily !== 'Todas' && p.olfactoryFamily === selectedFamily) matchCount++;
-    return matchCount >= 1;
-  }).slice(0, 3);
+  // Calculate matches with strict category enforcement and score ranking
+  const getRecommendations = () => {
+    // 1. Filtrar primeiro estritamente pela categoria escolhida
+    const pool = PRODUCTS.filter((p) => {
+      if (!p) return false;
+      if (selectedGender === 'Masculino') {
+        return p.category === 'Masculino';
+      }
+      if (selectedGender === 'Feminino') {
+        return p.category === 'Feminino';
+      }
+      if (selectedGender === 'Árabe') {
+        return p.category === 'Árabe';
+      }
+      if (selectedGender === 'Nicho') {
+        return p.category === 'Nicho';
+      }
+      return true;
+    });
 
-  const finalResults = recommendations.length > 0 ? recommendations : PRODUCTS.slice(0, 2);
+    // 2. Pontuar cada produto dentro da categoria correta
+    const scored = pool.map((p) => {
+      let score = 0;
+      // Combinação de família olfativa (peso maior)
+      if (selectedFamily !== 'Todas' && p.olfactoryFamily === selectedFamily) {
+        score += 3;
+      }
+      // Combinação de ocasião
+      if (selectedOccasion !== 'Todas' && Array.isArray(p.occasions) && p.occasions.includes(selectedOccasion as PerfumeOccasion)) {
+        score += 2;
+      }
+      // Preferência por itens em estoque e avaliações altas
+      if (p.inStock) score += 1;
+      if (p.rating >= 4.8) score += 1;
+
+      return { product: p, score };
+    });
+
+    // Ordenar pelos mais compatíveis
+    scored.sort((a, b) => b.score - a.score);
+
+    // Retornar os 3 melhores
+    const topScored = scored.map((s) => s.product).slice(0, 3);
+    if (topScored.length > 0) return topScored;
+
+    // Fallback: se nenhum pontuou alto, retorna os mais populares da mesma categoria
+    return pool.slice(0, 3);
+  };
+
+  const finalResults = getRecommendations();
 
   return (
     <AnimatePresence>
@@ -48,31 +87,36 @@ export const FragranceQuizModal: React.FC<FragranceQuizModalProps> = ({
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-white w-full max-w-2xl border border-neutral-200 shadow-2xl overflow-hidden flex flex-col"
+          className="bg-white w-full max-w-2xl border border-[#C5A059]/40 shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] rounded-lg"
         >
-          {/* Header */}
-          <div className="p-6 bg-[#0B0B0B] text-white flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 border border-[#C5A059]/40 bg-neutral-900 rounded-full">
+          {/* Always Sticky Header */}
+          <div className="sticky top-0 z-40 p-4 sm:p-5 bg-[#0B0B0B] text-white flex items-center justify-between border-b border-neutral-800 shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2 border border-[#C5A059]/40 bg-neutral-900 rounded-full shrink-0">
                 <Sparkles className="w-5 h-5 text-[#C5A059]" />
               </div>
-              <div>
-                <span className="text-[10px] font-sans tracking-[0.3em] uppercase text-[#C5A059]">
+              <div className="min-w-0">
+                <span className="text-[10px] font-sans tracking-[0.3em] uppercase text-[#C5A059] block truncate">
                   CONSULTORIA OLFATIVA
                 </span>
-                <h2 className="font-serif text-xl sm:text-2xl tracking-wide">
+                <h2 className="font-serif text-base sm:text-xl tracking-wide truncate">
                   Descubra Seu Perfume Ideal
                 </h2>
               </div>
             </div>
-            <button onClick={onClose} className="text-neutral-400 hover:text-white p-2">
-              <X className="w-6 h-6" />
+            <button 
+              onClick={onClose} 
+              className="flex items-center gap-1 px-3 py-1.5 bg-[#C5A059] hover:bg-[#D4B06A] text-neutral-950 text-xs font-bold uppercase tracking-wider rounded-sm transition-all cursor-pointer shadow-md shrink-0 ml-2"
+              title="Fechar Quiz"
+            >
+              <X className="w-4 h-4 stroke-[2.5]" />
+              <span>FECHAR</span>
             </button>
           </div>
 
           {/* Steps Progress */}
           {step <= 3 && (
-            <div className="w-full bg-neutral-100 h-1 flex">
+            <div className="w-full bg-neutral-100 h-1 flex shrink-0">
               <div
                 className="bg-[#C5A059] h-full transition-all duration-300"
                 style={{ width: `${(step / 3) * 100}%` }}
@@ -80,7 +124,7 @@ export const FragranceQuizModal: React.FC<FragranceQuizModalProps> = ({
             </div>
           )}
 
-          <div className="p-6 sm:p-8">
+          <div className="p-4 sm:p-7 overflow-y-auto flex-1">
             {step === 1 && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
                 <span className="text-xs font-mono uppercase text-[#C5A059] tracking-widest block mb-1">
@@ -239,7 +283,7 @@ export const FragranceQuizModal: React.FC<FragranceQuizModalProps> = ({
 
                       <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-0 pt-3 sm:pt-0 border-neutral-200">
                         <span className="font-serif text-lg font-bold text-neutral-950">
-                          R$ {product.price.toFixed(2)}
+                          R$ {(product.price || 130).toFixed(2)}
                         </span>
                         <button
                           onClick={() => {
@@ -256,13 +300,21 @@ export const FragranceQuizModal: React.FC<FragranceQuizModalProps> = ({
                   ))}
                 </div>
 
-                <div className="mt-6 text-center">
+                <div className="mt-7 pt-5 border-t border-neutral-200 flex flex-col sm:flex-row items-center justify-between gap-3">
                   <button
                     onClick={handleReset}
-                    className="inline-flex items-center gap-2 text-xs text-neutral-500 hover:text-black uppercase tracking-wider font-medium"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 py-2.5 px-4 text-xs text-neutral-600 hover:text-black uppercase tracking-wider font-semibold border border-neutral-300 rounded-sm hover:bg-neutral-100 transition-colors cursor-pointer"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Refazer Quiz Olfativo</span>
+                    <span>Refazer Quiz</span>
+                  </button>
+
+                  <button
+                    onClick={onClose}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 py-2.5 px-6 bg-[#0B0B0B] text-[#E0C078] hover:bg-[#C5A059] hover:text-black uppercase tracking-wider font-bold text-xs rounded-sm transition-all cursor-pointer shadow-md"
+                  >
+                    <X className="w-4 h-4" />
+                    <span>Fechar & Voltar à Loja</span>
                   </button>
                 </div>
               </motion.div>

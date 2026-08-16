@@ -20,17 +20,27 @@ export const ReferenceSearchModal: React.FC<ReferenceSearchModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Filter products matching search term against product name, referenceName, or referenceBrand
+  // Filter products matching search term against product name, referenceName, referenceBrand, category or list
   const results = PRODUCTS.filter((p) => {
+    if (!p) return false;
     if (!searchTerm.trim()) return false;
-    const term = searchTerm.toLowerCase();
-    return (
-      p.name.toLowerCase().includes(term) ||
-      p.referenceName.toLowerCase().includes(term) ||
-      p.referenceBrand.toLowerCase().includes(term) ||
-      p.category.toLowerCase().includes(term) ||
-      p.olfactoryFamily.toLowerCase().includes(term)
+    const term = searchTerm.toLowerCase().trim();
+    
+    const nameMatch = (p.name || '').toLowerCase().includes(term);
+    const refMatch = (p.referenceName || '').toLowerCase().includes(term);
+    const brandMatch = (p.referenceBrand || '').toLowerCase().includes(term);
+    const catMatch = (p.category || '').toLowerCase().includes(term);
+    const familyMatch = (p.olfactoryFamily || '').toLowerCase().includes(term);
+    
+    // Check if term matches alias in REFERENCE_PERFUMES_LIST
+    const aliasMatch = Array.isArray(REFERENCE_PERFUMES_LIST) && REFERENCE_PERFUMES_LIST.some(
+      (ref) => ref.targetId === p.id && (
+        (ref.inputName || '').toLowerCase().includes(term) ||
+        (ref.brand || '').toLowerCase().includes(term)
+      )
     );
+
+    return nameMatch || refMatch || brandMatch || catMatch || familyMatch || aliasMatch;
   });
 
   const popularSearches = [
@@ -39,9 +49,9 @@ export const ReferenceSearchModal: React.FC<ReferenceSearchModalProps> = ({
     'Baccarat Rouge 540',
     'Sauvage',
     'Delina',
-    'Khamrah',
     'Good Girl',
-    'Santal 33'
+    'Alien',
+    'Scandal'
   ];
 
   return (
@@ -180,11 +190,13 @@ export const ReferenceSearchModal: React.FC<ReferenceSearchModalProps> = ({
 
                     <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-neutral-100">
                       <div className="text-right">
-                        <span className="text-xs text-neutral-400 line-through block">
-                          R$ {product.originalPrice?.toFixed(2)}
-                        </span>
+                        {product.originalPrice ? (
+                          <span className="text-xs text-neutral-400 line-through block">
+                            R$ {product.originalPrice.toFixed(2)}
+                          </span>
+                        ) : null}
                         <span className="font-serif text-lg font-bold text-neutral-950">
-                          R$ {product.price.toFixed(2)}
+                          R$ {(product.price || 130).toFixed(2)}
                         </span>
                       </div>
                       <button

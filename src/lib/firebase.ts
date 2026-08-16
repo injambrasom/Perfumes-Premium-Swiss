@@ -7,7 +7,10 @@ import {
   setDoc,
   getDocs,
   updateDoc,
-  getDoc
+  getDoc,
+  deleteDoc,
+  query,
+  orderBy
 } from 'firebase/firestore';
 import {
   getDatabase,
@@ -27,6 +30,7 @@ const firebaseConfig = {
   recaptchaSiteKey: ""
 };
 import { INITIAL_INVENTORY, ProductStockData } from '../data/inventory';
+import { Order, OrderStatus } from '../types';
 import {
   resolveSiteProductId,
   resolveAllSiteProductIds,
@@ -340,3 +344,215 @@ export async function deductStockInFirebase(
     console.error('[FIREBASE]: Error deducting stock in Firestore:', error);
   }
 }
+
+/**
+ * Save an order to Firestore in real-time
+ */
+export async function saveOrderToFirebase(orderData: Omit<Order, 'id'> & { id?: string }): Promise<string> {
+  const generatedId = orderData.id || `order_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const orderDoc: Order = {
+    ...orderData,
+    id: generatedId,
+    orderNumber: orderData.orderNumber || `SWISS-${Math.floor(10000 + Math.random() * 90000)}`,
+    createdAt: orderData.createdAt || new Date().toISOString()
+  };
+
+  try {
+    // Save to primary Firestore db instance
+    const docRef = doc(db, 'orders', generatedId);
+    await setDoc(docRef, orderDoc);
+
+    // Also backup to default Firestore if different
+    if (defaultDb !== db) {
+      try {
+        const defaultDocRef = doc(defaultDb, 'orders', generatedId);
+        await setDoc(defaultDocRef, orderDoc);
+      } catch {
+        // ignore
+      }
+    }
+
+    // Save to Realtime Database as redundant backup
+    try {
+      await rtdbSet(rtdbRef(rtdb, `orders/${generatedId}`), orderDoc);
+    } catch {
+      // ignore
+    }
+
+    return generatedId;
+  } catch (error) {
+    console.error('[FIREBASE]: Error saving order to Firestore:', error);
+    // Fallback: save to localStorage if offline
+    try {
+      const localOrders = JSON.parse(localStorage.getItem('swiss_orders_backup') || '[]');
+      localOrders.unshift(orderDoc);
+      localStorage.setItem('swiss_orders_backup', JSON.stringify(localOrders));
+    } catch {
+      // ignore
+    }
+    return generatedId;
+  }
+}
+
+/**
+ * Subscribe to real-time updates for all orders (Admin Panel)
+ */
+export function subscribeToOrders(
+  onUpdate: (orders: Order[]) => void,
+  onError?: (err: any) => void
+): () => void {
+  const unsubscribes: Array<() => void> = [];
+  const ordersMap: Record<string, Order> = {};
+
+  const notify = () => {
+    const list = Object.values(ordersMap).sort((a, b) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+    onUpdate(list);
+  };
+
+  // 1. Subscribe to Firestore orders collection
+  try {
+    const colRef = collection(db, 'orders');
+    const q = query(colRef, orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data() as Order;
+          ordersMap[docSnap.id] = {
+            ...data,
+            id: docSnap.id
+          };
+        });
+        notify();
+      },
+      (err) => {
+        // If index not found or query fails, try basic collection
+        const fallbackUnsub = onSnapshot(
+          colRef,
+          (snapshot) => {
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data() as Order;
+              ordersMap[docSnap.id] = {
+                ...data,
+                id: docSnap.id
+              };
+            });
+            notify();
+          },
+          (error) => {
+            if (onError) onError(error);
+          }
+        );
+        unsubscribes.push(fallbackUnsub);
+      }
+    );
+    unsubscribes.push(unsub);
+  } catch (e) {
+    if (onError) onError(e);
+  }
+
+  // 2. Realtime Database subscription as backup
+  try {
+    const ordersRtdbRef = rtdbRef(rtdb, 'orders');
+    const unsubRtdb = rtdbOnValue(ordersRtdbRef, (snapshot) => {
+      const val = snapshot.val();
+      if (val && typeof val === 'object') {
+        Object.entries(val).forEach(([orderId, data]: [string, any]) => {
+          if (data && typeof data === 'object') {
+            ordersMap[orderId] = {
+              ...data,
+              id: orderId
+            };
+          }
+        });
+        notify();
+      }
+    });
+    unsubscribes.push(() => unsubRtdb());
+  } catch {
+    // ignore
+  }
+
+  // Check local storage backup
+  try {
+    const local = JSON.parse(localStorage.getItem('swiss_orders_backup') || '[]');
+    if (Array.isArray(local) && local.length > 0) {
+      local.forEach((o: Order) => {
+        if (o.id && !ordersMap[o.id]) {
+          ordersMap[o.id] = o;
+        }
+      });
+      notify();
+    }
+  } catch {
+    // ignore
+  }
+
+  return () => {
+    unsubscribes.forEach((fn) => fn());
+  };
+}
+
+/**
+ * Update order status and tracking code
+ */
+export async function updateOrderStatusInFirebase(
+  orderId: string,
+  status: OrderStatus,
+  trackingCode?: string
+): Promise<void> {
+  try {
+    const updateData: any = {
+      status,
+      updatedAt: new Date().toISOString()
+    };
+    if (trackingCode !== undefined) {
+      updateData.trackingCode = trackingCode;
+    }
+
+    // Update in Firestore
+    const docRef = doc(db, 'orders', orderId);
+    await updateDoc(docRef, updateData);
+
+    // Update in RTDB
+    try {
+      const rtdbOrderRef = rtdbRef(rtdb, `orders/${orderId}`);
+      await rtdbSet(rtdbOrderRef, updateData);
+    } catch {
+      // ignore
+    }
+  } catch (error) {
+    console.error('[FIREBASE]: Error updating order status:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete an order from Firestore and Realtime Database
+ */
+export async function deleteOrderFromFirebase(orderId: string): Promise<void> {
+  try {
+    const docRef = doc(db, 'orders', orderId);
+    await deleteDoc(docRef);
+
+    try {
+      await rtdbSet(rtdbRef(rtdb, `orders/${orderId}`), null);
+    } catch {
+      // ignore
+    }
+
+    try {
+      const local = JSON.parse(localStorage.getItem('swiss_orders_backup') || '[]');
+      const filtered = local.filter((o: Order) => o.id !== orderId);
+      localStorage.setItem('swiss_orders_backup', JSON.stringify(filtered));
+    } catch {
+      // ignore
+    }
+  } catch (error) {
+    console.error('[FIREBASE]: Error deleting order:', error);
+    throw error;
+  }
+}
+

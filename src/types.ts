@@ -108,3 +108,47 @@ export interface QuizState {
   occasion?: PerfumeOccasion;
   familyPreference?: OlfactoryFamily;
 }
+
+export type OrderStatus = 'pendente' | 'pago' | 'em_preparo' | 'enviado' | 'entregue' | 'cancelado';
+export type PaymentMethod = 'pix' | 'credit_card' | 'whatsapp';
+
+export interface OrderItem {
+  productId: string;
+  name: string;
+  referenceName?: string;
+  size: BottleSize;
+  quantity: number;
+  price: number;
+  image?: string;
+}
+
+export interface CustomerData {
+  name: string;
+  email: string;
+  phone: string;
+  cpf: string;
+  cep: string;
+  street: string;
+  number: string;
+  complement?: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+}
+
+export interface Order {
+  id: string;
+  orderNumber: string;
+  createdAt: string;
+  customer: CustomerData;
+  items: OrderItem[];
+  subtotal: number;
+  shipping: number;
+  discount: number;
+  total: number;
+  paymentMethod: PaymentMethod;
+  status: OrderStatus;
+  trackingCode?: string;
+  notes?: string;
+}
+

@@ -11,6 +11,20 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["15ml", "55ml", "100ml"]
+    },
+    "orders": {
+      "title": "Store Orders",
+      "description": "Customer completed orders with address, purchased items and payment details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "total": { "type": "number" },
+        "status": { "type": "string" },
+        "paymentMethod": { "type": "string" }
+      },
+      "required": ["id", "orderNumber", "createdAt", "total", "status", "paymentMethod"]
     }
   }
 }

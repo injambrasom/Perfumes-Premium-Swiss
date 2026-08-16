@@ -20,7 +20,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { CartItem } from '../types';
-import { deductStockInFirebase } from '../lib/firebase';
+import { deductStockInFirebase, saveOrderToFirebase, updateOrderStatusInFirebase } from '../lib/firebase';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -356,6 +356,45 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setStep('processing');
     setMpError(null);
 
+    // Save order data to Firebase Firestore immediately
+    try {
+      await saveOrderToFirebase({
+        id: orderId,
+        orderNumber: orderId,
+        createdAt: new Date().toISOString(),
+        customer: {
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+          cpf: formData.cpf.trim(),
+          cep: formData.cep.trim(),
+          street: formData.street.trim(),
+          number: formData.number.trim(),
+          complement: formData.complement?.trim() || '',
+          neighborhood: formData.neighborhood.trim(),
+          city: formData.city.trim(),
+          state: formData.state.trim()
+        },
+        items: items.map((i) => ({
+          productId: i.product.id,
+          name: i.product.name,
+          referenceName: i.product.referenceName,
+          size: (i.selectedSize || '100ml') as any,
+          quantity: i.quantity,
+          price: i.selectedPrice,
+          image: i.product.image
+        })),
+        subtotal: subtotal,
+        shipping: freightCost,
+        discount: Math.max(0, (subtotal + freightCost) - finalTotal),
+        total: finalTotal,
+        paymentMethod: paymentMethod,
+        status: 'pendente'
+      });
+    } catch (saveErr) {
+      console.error('Error saving order initially:', saveErr);
+    }
+
     if (paymentMethod === 'pix') {
       try {
         const cleanDocNum = formData.cpf.replace(/\D/g, '');
@@ -416,6 +455,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
         const data = await response.json();
         syncInventoryDeduction();
+        try {
+          await updateOrderStatusInFirebase(orderId, 'pago');
+        } catch {
+          // ignore
+        }
         if (response.ok && data.init_point) {
           window.open(data.init_point, '_blank');
           setStep('success');
@@ -460,8 +504,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setTimeout(() => setCopiedPix(false), 3000);
   };
 
-  const handleConfirmPixPayment = () => {
+  const handleConfirmPixPayment = async () => {
     syncInventoryDeduction();
+    try {
+      await updateOrderStatusInFirebase(orderId, 'pago');
+    } catch {
+      // ignore
+    }
     setStep('success');
     onClearCart();
   };

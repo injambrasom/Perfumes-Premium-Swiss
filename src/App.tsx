@@ -18,6 +18,7 @@ import { ProductDetailModal } from './components/ProductDetailModal';
 import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './components/CheckoutModal';
 import { PurchasingPolicyModal } from './components/PurchasingPolicyModal';
+import { AdminOrdersModal } from './components/AdminOrdersModal';
 import { FloatingWhatsapp } from './components/FloatingWhatsapp';
 import { PRODUCTS } from './data/products';
 import { FragranceProduct, CartItem, BottleSize } from './types';
@@ -32,6 +33,7 @@ export default function App() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isTrioModalOpen, setIsTrioModalOpen] = useState(false);
   const [isPolicyOpen, setIsPolicyOpen] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<FragranceProduct | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [lastSyncInfo, setLastSyncInfo] = useState<{
@@ -95,6 +97,40 @@ export default function App() {
     return () => {
       unsubscribeFirebase();
       clearInterval(interval);
+    };
+  }, []);
+
+  // Admin Shortcut Listener (Ctrl+Shift+A / Cmd+Shift+A or #admin / ?admin in URL)
+  useEffect(() => {
+    const checkAdminTrigger = () => {
+      const hash = window.location.hash;
+      const params = new URLSearchParams(window.location.search);
+      if (
+        hash === '#admin' || 
+        hash === '#gestao' || 
+        hash === '#pedidos' || 
+        params.get('admin') === '1' || 
+        params.get('admin') === 'true'
+      ) {
+        setIsAdminOpen(true);
+      }
+    };
+
+    checkAdminTrigger();
+    window.addEventListener('hashchange', checkAdminTrigger);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Shortcut: Ctrl + Shift + A (Windows/Linux) or Cmd + Shift + A (Mac)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setIsAdminOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('hashchange', checkAdminTrigger);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
@@ -416,13 +452,33 @@ export default function App() {
 
           <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-[11px] font-mono text-neutral-500 gap-4">
             <div className="flex flex-wrap items-center gap-3">
-              <p>© {new Date().getFullYear()} PERFUMES PREMIUM SWISS ATELIER.</p>
+              <p 
+                onClick={(e) => {
+                  // Secret triple-click or double-click to open admin
+                  if (e.detail >= 2) {
+                    setIsAdminOpen(true);
+                  }
+                }}
+                className="cursor-default select-none"
+                title="© Ateliê"
+              >
+                © {new Date().getFullYear()} PERFUMES PREMIUM SWISS ATELIER.
+              </p>
               <span className="text-neutral-700 hidden sm:inline">•</span>
               <button
                 onClick={() => setIsPolicyOpen(true)}
                 className="hover:text-[#C5A059] transition-colors underline decoration-neutral-700 underline-offset-4 cursor-pointer"
               >
                 Política de Compras
+              </button>
+              {/* Discrete hidden admin lock trigger */}
+              <button
+                onClick={() => setIsAdminOpen(true)}
+                className="text-neutral-800 hover:text-neutral-500 opacity-20 hover:opacity-100 transition-opacity p-0.5 cursor-pointer"
+                title="Gestão"
+                aria-label="Gestão"
+              >
+                🔒
               </button>
             </div>
             <button
@@ -437,6 +493,11 @@ export default function App() {
       </footer>
 
       {/* Modals & Drawers */}
+      <AdminOrdersModal
+        isOpen={isAdminOpen}
+        onClose={() => setIsAdminOpen(false)}
+      />
+
       <ReferenceSearchModal
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
