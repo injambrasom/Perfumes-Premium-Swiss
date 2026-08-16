@@ -175,21 +175,14 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
           />
 
           {/* Badges Overlay */}
-          <div className="absolute top-2 left-2 flex flex-col gap-1 z-10 max-w-[70%]">
+          <div className="absolute top-2 left-2 flex flex-col gap-1 z-10 max-w-[80%] pointer-events-none">
             {!product.inStock && (
-              <span className="px-1.5 py-0.5 bg-red-950/90 text-red-200 text-[8px] sm:text-[9px] font-bold tracking-widest uppercase backdrop-blur-md border border-red-500/50 shadow-sm truncate">
+              <span className="px-1.5 py-0.5 bg-red-950/90 text-red-200 text-[7px] sm:text-[9px] font-bold tracking-widest uppercase backdrop-blur-md border border-red-500/50 shadow-sm truncate">
                 ESGOTADO
               </span>
             )}
-            <span className="px-1.5 py-0.5 bg-black/80 text-neutral-200 text-[8px] sm:text-[9px] font-medium tracking-wider uppercase backdrop-blur-md border border-white/10 shadow-sm truncate">
+            <span className="px-1.5 py-0.5 bg-black/80 text-neutral-200 text-[7px] sm:text-[9px] font-medium tracking-wider uppercase backdrop-blur-md border border-white/10 shadow-sm truncate">
               PRODUTO REAL
-            </span>
-          </div>
-
-          {/* Inspired Reference Badge */}
-          <div className="absolute top-2 right-2 z-10 max-w-[65%]">
-            <span className="px-1.5 py-0.5 bg-[#C5A059] text-black text-[8px] sm:text-[9px] font-bold tracking-wider uppercase shadow-md block truncate">
-              {product.referenceName.startsWith('Inspirado em') ? product.referenceName : `Inspirado em ${product.referenceName}`}
             </span>
           </div>
 
@@ -213,7 +206,7 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
         </div>
 
         {/* Product Info */}
-        <div className="p-3 sm:p-5">
+        <div className="p-2.5 sm:p-5">
           {/* Category & Rating */}
           <div className="flex items-center justify-between text-[10px] sm:text-xs font-light mb-1">
             <span className={`uppercase tracking-widest text-[8px] sm:text-[10px] font-mono font-medium truncate ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>
@@ -226,12 +219,12 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
           </div>
 
           {/* Perfume Name */}
-          <h3 className={`font-serif text-sm sm:text-lg font-bold tracking-wide transition-colors group-hover:text-[#C5A059] line-clamp-1 ${isDarkMode ? 'text-white' : 'text-neutral-950'}`}>
+          <h3 className={`font-serif text-xs sm:text-lg font-bold tracking-wide transition-colors group-hover:text-[#C5A059] line-clamp-1 ${isDarkMode ? 'text-white' : 'text-neutral-950'}`}>
             {product.name}
           </h3>
 
           {/* Inspired Highlight */}
-          <div className={`mt-1 flex items-center gap-1 text-[9px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-xs w-full truncate border ${
+          <div className={`mt-1 flex items-center gap-1 text-[8px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-xs w-full truncate border ${
             isDarkMode
               ? 'text-neutral-300 bg-white/5 border-white/10'
               : 'text-neutral-700 bg-neutral-100 border-neutral-200'
@@ -260,23 +253,23 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
       </div>
 
       {/* Card Footer: Price & Direct Actions */}
-      <div className={`p-3 sm:p-4 pt-2 mt-auto border-t flex flex-col gap-2.5 ${
+      <div className={`p-2.5 sm:p-4 pt-2 mt-auto border-t flex flex-col gap-2 ${
         isDarkMode ? 'border-white/10' : 'border-neutral-100'
       }`}>
-        <div className="flex items-center justify-between gap-2 w-full">
-          <div className="min-w-0 flex-1">
-            <span className="text-[8px] sm:text-[9px] text-neutral-400 block font-light uppercase tracking-wider truncate">
+        <div className="flex flex-col gap-1.5 sm:gap-2 w-full">
+          <div className="min-w-0">
+            <span className="text-[7.5px] sm:text-[9px] text-neutral-400 block font-light uppercase tracking-wider truncate">
               36% Concentração • A partir de
             </span>
-            <span className={`font-serif text-sm sm:text-base font-bold whitespace-nowrap ${isDarkMode ? 'text-white' : 'text-neutral-950'}`}>
-              R$ 35,00 <span className="text-[9px] sm:text-xs font-sans font-normal text-neutral-400">(15ml)</span>
+            <span className={`font-serif text-xs sm:text-base font-bold whitespace-nowrap ${isDarkMode ? 'text-white' : 'text-neutral-950'}`}>
+              R$ 35,00 <span className="text-[8px] sm:text-xs font-sans font-normal text-neutral-400">(15ml)</span>
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1.5 w-full">
             <button
               onClick={() => onQuickView(product)}
-              className="px-3 sm:px-4 py-2 bg-white text-black hover:bg-[#C5A059] transition-all text-[10px] sm:text-xs font-bold tracking-wider uppercase cursor-pointer text-center whitespace-nowrap shrink-0"
+              className="flex-1 py-1.5 sm:py-2 px-2 sm:px-4 bg-white text-black hover:bg-[#C5A059] transition-all text-[9px] sm:text-xs font-bold tracking-wider uppercase cursor-pointer text-center truncate"
             >
               Escolher Fragrância
             </button>
@@ -286,7 +279,7 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
               )}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-2 border border-white/20 text-neutral-300 hover:text-white hover:border-white transition-all rounded-none shrink-0"
+              className="p-1.5 sm:p-2 border border-white/20 text-neutral-300 hover:text-white hover:border-white transition-all shrink-0 flex items-center justify-center"
               title="Pedir no WhatsApp"
             >
               <MessageCircle className="w-3.5 h-3.5" />
@@ -462,7 +455,7 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
             
             {/* 1. SEÇÃO MASCULINOS */}
             <div className="space-y-6">
-              <div className="flex items-center justify-between border-b border-[#C5A059]/30 pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[#C5A059]/30 pb-3">
                 <div>
                   <span className="text-[10px] font-mono tracking-[0.2em] text-[#C5A059] uppercase block font-semibold">
                     COLEÇÃO MASCULINA
@@ -473,7 +466,7 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
                 </div>
                 <button
                   onClick={() => handleSelectAndScroll('Masculino')}
-                  className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#C5A059] hover:text-white transition-colors cursor-pointer group"
+                  className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#C5A059] hover:text-white transition-colors cursor-pointer group self-start sm:self-auto"
                 >
                   <span>Ver todos os Masculinos ({masculinosList.length})</span>
                   <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
@@ -498,7 +491,7 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
 
             {/* 2. SEÇÃO FEMININOS */}
             <div className="space-y-6">
-              <div className="flex items-center justify-between border-b border-[#C5A059]/30 pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[#C5A059]/30 pb-3">
                 <div>
                   <span className="text-[10px] font-mono tracking-[0.2em] text-[#C5A059] uppercase block font-semibold">
                     COLEÇÃO FEMININA
@@ -509,7 +502,7 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
                 </div>
                 <button
                   onClick={() => handleSelectAndScroll('Feminino')}
-                  className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#C5A059] hover:text-white transition-colors cursor-pointer group"
+                  className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#C5A059] hover:text-white transition-colors cursor-pointer group self-start sm:self-auto"
                 >
                   <span>Ver todos os Femininos ({femininosList.length})</span>
                   <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
@@ -533,7 +526,7 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
 
             {/* 3. SEÇÃO ÁRABES */}
             <div className="space-y-6">
-              <div className="flex items-center justify-between border-b border-[#C5A059]/30 pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[#C5A059]/30 pb-3">
                 <div>
                   <span className="text-[10px] font-mono tracking-[0.2em] text-[#C5A059] uppercase block font-semibold">
                     ALTA ORIENTAL • OPULÊNCIA
@@ -544,7 +537,7 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
                 </div>
                 <button
                   onClick={() => handleSelectAndScroll('Árabe')}
-                  className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#C5A059] hover:text-white transition-colors cursor-pointer group"
+                  className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#C5A059] hover:text-white transition-colors cursor-pointer group self-start sm:self-auto"
                 >
                   <span>Ver todos os Árabes ({arabesList.length})</span>
                   <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
@@ -568,7 +561,7 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
 
             {/* 4. SEÇÃO NICHO */}
             <div className="space-y-6">
-              <div className="flex items-center justify-between border-b border-[#C5A059]/30 pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[#C5A059]/30 pb-3">
                 <div>
                   <span className="text-[10px] font-mono tracking-[0.2em] text-[#C5A059] uppercase block font-semibold">
                     EXCLUSIVIDADE • ATELIÊ NICHO
@@ -579,7 +572,7 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
                 </div>
                 <button
                   onClick={() => handleSelectAndScroll('Nicho')}
-                  className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#C5A059] hover:text-white transition-colors cursor-pointer group"
+                  className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#C5A059] hover:text-white transition-colors cursor-pointer group self-start sm:self-auto"
                 >
                   <span>Ver todos de Nicho ({nichoList.length})</span>
                   <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
@@ -605,7 +598,7 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
         ) : (
           /* --- VIEW MODE 2: SINGLE CATEGORY EXPANDED GRID --- */
           <div className="mt-10 space-y-6">
-            <div className="flex items-center justify-between bg-black/40 p-4 border border-[#C5A059]/30 rounded-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-black/40 p-4 border border-[#C5A059]/30 rounded-xs">
               <div>
                 <span className="text-[10px] font-mono text-[#C5A059] uppercase tracking-widest block font-semibold">
                   CATEGORIA SELECIONADA
@@ -616,7 +609,7 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
               </div>
               <button
                 onClick={() => handleSelectAndScroll('Todos')}
-                className="flex items-center gap-2 px-4 py-2 bg-[#C5A059] text-black hover:bg-white text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-md"
+                className="flex items-center gap-2 px-4 py-2 bg-[#C5A059] text-black hover:bg-white text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-md self-start sm:self-auto"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Ver Todas as Categorias</span>

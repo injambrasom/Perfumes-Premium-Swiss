@@ -77,27 +77,27 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </div>
 
           {/* Always Pinned Top Sticky Bar with Close Button */}
-          <div className="sticky top-0 z-40 bg-[#07070A]/90 backdrop-blur-md text-white px-5 py-3.5 flex items-center justify-between border-b border-[#C5A059]/30 shrink-0">
-            <div className="flex items-center gap-2.5">
-              <span className="w-2 h-2 rounded-full bg-[#C5A059] animate-pulse"></span>
-              <span className="text-xs font-mono uppercase tracking-widest text-[#E0C078] font-bold truncate max-w-[260px] sm:max-w-none">
-                {product.referenceName.startsWith('Inspirado em') ? product.referenceName : `Inspirado em ${product.referenceName}`}{product.referenceBrand ? ` (${product.referenceBrand})` : ''} • 36% ESSÊNCIA
+          <div className="sticky top-0 z-40 bg-[#07070A]/95 backdrop-blur-md text-white px-4 sm:px-5 py-3 flex items-center justify-between border-b border-[#C5A059]/30 shrink-0 gap-2">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <span className="w-2 h-2 rounded-full bg-[#C5A059] animate-pulse shrink-0"></span>
+              <span className="text-[11px] sm:text-xs font-mono uppercase tracking-wider sm:tracking-widest text-[#E0C078] font-bold truncate">
+                {product.referenceName.startsWith('Inspirado em') ? product.referenceName : `Inspirado em ${product.referenceName}`} • 36% ESSÊNCIA
               </span>
             </div>
             <button
               onClick={onClose}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#C5A059] hover:bg-[#D4B06A] text-neutral-950 text-xs font-bold uppercase tracking-wider transition-all rounded-sm cursor-pointer shadow-md shrink-0"
-              title="Fechar (ESC)"
+              className="flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 bg-[#C5A059] hover:bg-[#D4B06A] text-neutral-950 text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all rounded-sm cursor-pointer shadow-md shrink-0"
+              title="Fechar"
             >
               <X className="w-4 h-4 stroke-[2.5]" />
               <span>FECHAR</span>
             </button>
           </div>
 
-          <div className="flex flex-col md:grid md:grid-cols-2 overflow-hidden flex-1 min-h-0 relative z-10">
+          <div className="flex flex-col md:grid md:grid-cols-2 overflow-y-auto md:overflow-hidden flex-1 min-h-0 relative z-10">
 
-            {/* Left Image Section - Fixed in viewport while text scrolls, filling entire frame */}
-            <div className="relative flex items-center justify-center h-[300px] sm:h-[400px] md:h-full overflow-hidden shrink-0 md:shrink border-b md:border-b-0 md:border-r border-[#C5A059]/30 bg-black">
+            {/* Left Image Section - Scrolls together on mobile, giving full height and visibility */}
+            <div className="relative flex items-center justify-center h-[260px] sm:h-[340px] md:h-full overflow-hidden shrink-0 md:shrink border-b md:border-b-0 md:border-r border-[#C5A059]/30 bg-black">
               {/* Black Gold Marble Background Texture */}
               <img 
                 src={blackGoldMarbleBg} 
@@ -115,20 +115,20 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               />
 
               {/* Subtle bottom gradient overlay for badge contrast */}
-              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none z-10" />
+              <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none z-10" />
 
-              <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center pointer-events-none z-20">
-                <span className="px-3 py-1 bg-black/85 text-[#E0C078] text-[10px] font-mono font-bold tracking-widest uppercase border border-[#C5A059]/40 rounded-sm backdrop-blur-md shadow-md">
+              <div className="absolute bottom-2.5 left-3 right-3 flex justify-between items-center pointer-events-none z-20">
+                <span className="px-2.5 py-0.5 bg-black/85 text-[#E0C078] text-[9px] sm:text-[10px] font-mono font-bold tracking-widest uppercase border border-[#C5A059]/40 rounded-sm backdrop-blur-md shadow-md">
                   FOTO REAL DO PRODUTO
                 </span>
-                <span className="px-3 py-1 bg-black/85 text-white text-[10px] font-mono tracking-widest uppercase border border-white/20 rounded-sm backdrop-blur-md shadow-md">
+                <span className="px-2.5 py-0.5 bg-black/85 text-white text-[9px] sm:text-[10px] font-mono tracking-widest uppercase border border-white/20 rounded-sm backdrop-blur-md shadow-md">
                   {product.category}
                 </span>
               </div>
             </div>
 
-            {/* Right Details Section - Only text scrolls */}
-            <div className="p-5 sm:p-7 md:p-8 flex flex-col justify-between space-y-6 z-10 text-white overflow-y-auto max-h-full flex-1">
+            {/* Right Details Section */}
+            <div className="p-4 sm:p-7 md:p-8 flex flex-col justify-between space-y-6 z-10 text-white md:overflow-y-auto md:max-h-full flex-1">
               <div>
                 {/* Category & Ratings */}
                 <div className="flex items-center justify-between text-xs font-mono mb-2">

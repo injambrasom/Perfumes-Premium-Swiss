@@ -179,8 +179,8 @@ export const TrioBundleBuilder: React.FC<TrioBundleBuilderProps> = ({
 
                 {/* Slot Content */}
                 {product ? (
-                  <div className="flex items-center gap-4 my-auto">
-                    <div className="w-16 h-20 sm:w-20 sm:h-24 bg-black p-2 rounded shrink-0 border border-[#C5A059]/40 flex items-center justify-center relative overflow-hidden">
+                  <div className="flex items-center gap-3 sm:gap-4 my-auto">
+                    <div className="w-24 h-32 sm:w-28 sm:h-36 bg-black/90 p-1.5 rounded-md shrink-0 border-2 border-[#C5A059]/60 flex items-center justify-center relative overflow-hidden shadow-inner">
                       <img
                         src={blackGoldMarbleBg}
                         alt=""
@@ -189,7 +189,7 @@ export const TrioBundleBuilder: React.FC<TrioBundleBuilderProps> = ({
                       <img
                         src={product.image}
                         alt={product.name}
-                        className="w-full h-full object-contain relative z-1"
+                        className="w-full h-full object-contain relative z-1 drop-shadow-md scale-105"
                         onError={(e) => handleImageError(e, product.image)}
                       />
                     </div>
@@ -357,7 +357,7 @@ export const TrioBundleBuilder: React.FC<TrioBundleBuilderProps> = ({
                 >
                   <div>
                     {/* Image */}
-                    <div className="aspect-square bg-black p-2 rounded mb-2 flex items-center justify-center relative overflow-hidden border border-neutral-800 group-hover:border-[#C5A059]/50">
+                    <div className="aspect-[4/5] bg-black p-1.5 rounded mb-2 flex items-center justify-center relative overflow-hidden border border-neutral-800 group-hover:border-[#C5A059]/50">
                       <img
                         src={blackGoldMarbleBg}
                         alt=""

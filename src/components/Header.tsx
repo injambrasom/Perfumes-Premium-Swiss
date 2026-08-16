@@ -25,6 +25,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenPolicy,
   onOpenWhatsApp,
   cartCount,
+  activeCategory,
   onSelectCategory
 }) => {
   const [announcementIdx, setAnnouncementIdx] = useState(0);
@@ -134,20 +135,20 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Main Navbar Row 1: Logo & Navigation */}
       <div
         className={`w-full max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 transition-all duration-300 ${
-          isScrolled ? 'py-2' : 'py-3'
-        } flex items-center justify-between gap-4`}
+          isScrolled ? 'py-2' : 'py-2.5 sm:py-3'
+        } flex items-center justify-between gap-3 sm:gap-4`}
       >
         {/* Mobile / Tablet Hamburger */}
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="xl:hidden text-white p-1.5 focus:outline-none shrink-0 cursor-pointer hover:text-[#C5A059] transition-colors"
+          className="xl:hidden text-white p-1 -ml-1 focus:outline-none shrink-0 cursor-pointer hover:text-[#C5A059] transition-colors"
           aria-label="Abrir Menu"
         >
           <Menu className="w-6 h-6 text-[#C5A059]" />
         </button>
 
         {/* Logo */}
-        <div className="shrink-0 min-w-0">
+        <div className="min-w-0 flex-1">
           <a
             href="#top"
             onClick={(e) => {
@@ -155,9 +156,9 @@ export const Header: React.FC<HeaderProps> = ({
               onSelectCategory('Todos');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="inline-flex items-center gap-3 sm:gap-4 group text-left cursor-pointer"
+            className="inline-flex items-center gap-2.5 sm:gap-4 group text-left cursor-pointer max-w-full"
           >
-            <div className="w-14 h-14 sm:w-18 sm:h-18 xl:w-20 xl:h-20 rounded-full border-2 border-[#C5A059] overflow-hidden shrink-0 shadow-[0_0_20px_rgba(197,160,89,0.35)] p-0.5 bg-black transition-transform duration-300 group-hover:scale-105">
+            <div className="w-11 h-11 sm:w-16 sm:h-16 xl:w-20 xl:h-20 rounded-full border-2 border-[#C5A059] overflow-hidden shrink-0 shadow-[0_0_20px_rgba(197,160,89,0.35)] p-0.5 bg-black transition-transform duration-300 group-hover:scale-105">
               <img 
                 src={LOGO_IMAGE_URL} 
                 alt="Logo Perfumes Premium Swiss" 
@@ -166,10 +167,10 @@ export const Header: React.FC<HeaderProps> = ({
               />
             </div>
             <div className="min-w-0">
-              <span className="block font-serif text-base sm:text-xl lg:text-2xl xl:text-3xl tracking-[0.08em] font-bold text-white uppercase leading-tight whitespace-nowrap drop-shadow-md">
+              <span className="block font-serif text-[12.5px] min-[360px]:text-sm sm:text-lg md:text-xl lg:text-2xl xl:text-3xl tracking-[0.03em] sm:tracking-[0.08em] font-bold text-white uppercase leading-tight drop-shadow-md">
                 PERFUMES PREMIUM SWISS
               </span>
-              <span className="block text-[10px] sm:text-xs lg:text-sm font-sans tracking-[0.28em] font-medium text-[#C5A059] uppercase mt-0.5 whitespace-nowrap">
+              <span className="block text-[9px] sm:text-xs lg:text-sm font-sans tracking-[0.2em] sm:tracking-[0.28em] font-medium text-[#C5A059] uppercase mt-0.5">
                 SWISS ATELIER
               </span>
             </div>
@@ -189,97 +190,90 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           ))}
         </nav>
-
-        {/* Mobile Quick Cart Trigger */}
-        <div className="xl:hidden shrink-0">
-          <button
-            onClick={onOpenCart}
-            className="flex items-center gap-1.5 bg-[#1A140B] text-[#E0C078] py-1.5 px-3 border border-[#C5A059] rounded-full text-xs font-bold"
-            title="Abrir Sacola"
-          >
-            <ShoppingBag className="w-4 h-4 text-[#C5A059]" />
-            <span>({cartCount})</span>
-          </button>
-        </div>
       </div>
 
-      {/* Row 2: Secondary Action Bar (Main action buttons) */}
-      <div className="w-full bg-[#08080B]/90 border-t border-[#C5A059]/25 py-2 px-3 sm:px-6 lg:px-8">
-        <div className="max-w-[1600px] mx-auto flex items-center justify-center xl:justify-end gap-2.5 sm:gap-4 flex-wrap">
-          {/* Reference Search Trigger */}
+      {/* Row 2: Secondary Action Bar (Main action buttons in 2x2 grid on mobile, row on desktop) */}
+      <div className="w-full bg-[#08080B]/95 border-t border-[#C5A059]/25 py-2 px-2.5 sm:px-6 lg:px-8">
+        <div className="max-w-[1600px] mx-auto grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-center xl:justify-end sm:gap-3">
+          {/* 1. Reference Search Trigger */}
           <button
             onClick={onOpenSearch}
-            className="flex items-center gap-2 text-xs uppercase tracking-wider text-neutral-200 hover:text-white py-1.5 px-3.5 border border-[#C5A059]/60 hover:border-[#C5A059] transition-all rounded-full bg-black/60 backdrop-blur-xs cursor-pointer shadow-sm hover:scale-105"
+            className="w-full sm:w-auto flex items-center justify-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs uppercase tracking-wider text-neutral-200 hover:text-white py-2 sm:py-1.5 px-2 sm:px-3.5 border border-[#C5A059]/60 hover:border-[#C5A059] transition-all rounded-full bg-black/60 backdrop-blur-xs cursor-pointer shadow-sm hover:scale-105"
             title="Buscar por Perfume de Referência"
           >
             <Search className="w-3.5 h-3.5 text-[#C5A059] shrink-0" />
-            <span className="font-medium text-xs whitespace-nowrap">Perfume de Referência</span>
+            <span className="font-medium truncate">Perfume Referência</span>
           </button>
 
-          {/* Perfume Quiz Trigger */}
+          {/* 2. Perfume Quiz Trigger */}
           <button
             onClick={onOpenQuiz}
-            className="flex items-center gap-2 text-xs uppercase tracking-wider text-black bg-[#C5A059] hover:bg-white transition-all py-1.5 px-3.5 border border-[#C5A059] rounded-full font-bold shadow-md cursor-pointer hover:scale-105"
+            className="w-full sm:w-auto flex items-center justify-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs uppercase tracking-wider text-black bg-[#C5A059] hover:bg-white transition-all py-2 sm:py-1.5 px-2.5 sm:px-3.5 border border-[#C5A059] rounded-full font-bold shadow-md cursor-pointer hover:scale-105"
             title="Fazer Quiz Olfativo"
           >
             <Sparkles className="w-3.5 h-3.5 text-black shrink-0" />
-            <span className="whitespace-nowrap text-xs font-bold">Quiz Olfativo</span>
+            <span className="font-bold truncate">Quiz Olfativo</span>
           </button>
 
-          {/* Direct WhatsApp Contact Button */}
+          {/* 3. Direct WhatsApp Contact Button */}
           <button
             onClick={handleWhatsAppContact}
-            className="flex items-center gap-2 text-xs uppercase tracking-wider text-neutral-100 hover:text-white py-1.5 px-3.5 border border-[#C5A059]/60 hover:border-[#C5A059] bg-[#0E0E12] transition-all rounded-full font-medium shadow-md cursor-pointer hover:scale-105"
+            className="w-full sm:w-auto flex items-center justify-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs uppercase tracking-wider text-neutral-100 hover:text-white py-2 sm:py-1.5 px-2 sm:px-3.5 border border-[#C5A059]/60 hover:border-[#C5A059] bg-[#0E0E12] transition-all rounded-full font-medium shadow-md cursor-pointer hover:scale-105"
             title="Falar no WhatsApp com Consultor Olfativo"
           >
             <MessageCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span className="whitespace-nowrap text-xs font-semibold">Fale com um Consultor</span>
+            <span className="font-semibold truncate">Fale com Consultor</span>
           </button>
 
-          {/* Sacola Button */}
+          {/* 4. Sacola Button */}
           <button
             onClick={onOpenCart}
-            className="flex items-center gap-2 bg-gradient-to-r from-[#1A140B] via-[#2A2012] to-[#1A140B] hover:from-[#C5A059] hover:to-[#E0C078] text-[#E0C078] hover:text-black py-1.5 px-4 border-2 border-[#C5A059] rounded-full shadow-[0_0_15px_rgba(197,160,89,0.4)] transition-all duration-300 cursor-pointer font-bold group hover:scale-105"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-[#1A140B] via-[#2A2012] to-[#1A140B] hover:from-[#C5A059] hover:to-[#E0C078] text-[#E0C078] hover:text-black py-2 sm:py-1.5 px-3 sm:px-4 border-2 border-[#C5A059] rounded-full shadow-[0_0_15px_rgba(197,160,89,0.4)] transition-all duration-300 cursor-pointer font-bold group hover:scale-105"
             aria-label="Abrir Sacola de Compras"
             title="Sua Sacola de Compras"
           >
             <div className="relative">
-              <ShoppingBag className="w-4 h-4 text-[#C5A059] group-hover:text-black transition-colors" />
+              <ShoppingBag className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#C5A059] group-hover:text-black transition-colors" />
               {cartCount > 0 && (
                 <span className="absolute -top-2 -right-2 bg-emerald-500 text-black text-[9px] font-extrabold w-3.5 h-3.5 rounded-full flex items-center justify-center animate-pulse">
                   {cartCount}
                 </span>
               )}
             </div>
-            <span className="font-mono text-xs font-extrabold uppercase tracking-wider whitespace-nowrap">
+            <span className="font-mono text-[11px] sm:text-xs font-extrabold uppercase tracking-wider truncate">
               Sacola {cartCount > 0 && `(${cartCount})`}
             </span>
           </button>
         </div>
       </div>
 
-      {/* Mobile / Tablet Navigation Drawer */}
+      {/* Mobile / Tablet Navigation Drawer from Left */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <>
+            {/* Backdrop Overlay */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
               onClick={() => setIsMobileMenuOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 xl:hidden"
+              className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 xl:hidden cursor-pointer"
             />
+
+            {/* Slide Drawer from Left */}
             <motion.div
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
-              transition={{ type: 'tween', duration: 0.3 }}
-              className="fixed top-0 left-0 bottom-0 w-[85%] max-w-sm bg-white z-50 p-6 flex flex-col justify-between overflow-y-auto shadow-2xl xl:hidden"
+              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+              className="fixed top-0 left-0 bottom-0 w-[88%] max-w-sm sm:max-w-md h-[100dvh] bg-[#0A0A0E] text-white z-50 p-4 sm:p-5 flex flex-col justify-between overflow-y-auto border-r border-[#C5A059]/30 shadow-[10px_0_35px_rgba(0,0,0,0.85)] xl:hidden"
             >
-              <div>
-                <div className="flex items-center justify-between pb-6 border-b border-neutral-100">
-                  <div className="flex items-center gap-3">
-                    <div className="w-14 h-14 rounded-full border border-[#C5A059] overflow-hidden shrink-0 p-0.5 bg-black shadow-md">
+              {/* Drawer Content */}
+              <div className="flex-1 flex flex-col justify-start">
+                <div className="flex items-center justify-between pb-4 border-b border-[#C5A059]/30">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-12 h-12 rounded-full border-2 border-[#C5A059] overflow-hidden shrink-0 p-0.5 bg-black shadow-[0_0_15px_rgba(197,160,89,0.3)]">
                       <img 
                         src={LOGO_IMAGE_URL} 
                         alt="Logo Perfumes Premium Swiss" 
@@ -287,8 +281,8 @@ export const Header: React.FC<HeaderProps> = ({
                         referrerPolicy="no-referrer"
                       />
                     </div>
-                    <div>
-                      <span className="block font-serif text-base sm:text-lg font-bold tracking-[0.1em] text-neutral-950 uppercase leading-snug">
+                    <div className="min-w-0">
+                      <span className="block font-serif text-base font-bold tracking-[0.06em] text-white uppercase leading-tight">
                         PERFUMES PREMIUM SWISS
                       </span>
                       <span className="block text-[10px] font-sans tracking-[0.25em] font-medium text-[#C5A059] uppercase mt-0.5">
@@ -296,77 +290,71 @@ export const Header: React.FC<HeaderProps> = ({
                       </span>
                     </div>
                   </div>
+
                   <button
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="p-2 text-neutral-500 hover:text-neutral-950"
+                    className="p-2 text-neutral-300 hover:text-white bg-white/5 hover:bg-[#C5A059]/20 border border-[#C5A059]/40 rounded-full transition-colors cursor-pointer shrink-0"
+                    aria-label="Fechar Menu"
                   >
-                    <X className="w-6 h-6" />
+                    <X className="w-5 h-5 text-[#C5A059]" />
                   </button>
                 </div>
 
-                <div className="mt-6 space-y-1">
-                  {menuItems.map((item) => (
+                {/* Categorias uma em baixo da outra (apenas o nome sem estar dentro da caixa) */}
+                <div className="mt-4 divide-y divide-white/10">
+                  {menuItems.map((item) => {
+                    const isActive = activeCategory === item.value;
+                    return (
+                      <button
+                        key={item.label}
+                        onClick={() => handleNavClick(item.value)}
+                        className={`w-full text-left py-3 px-1 text-sm tracking-[0.15em] uppercase transition-all flex items-center justify-between group cursor-pointer ${
+                          isActive
+                            ? 'text-[#C5A059] font-bold pl-2'
+                            : 'text-neutral-200 hover:text-white font-medium hover:pl-2'
+                        }`}
+                      >
+                        <span className="truncate">{item.label}</span>
+                        <ChevronRight className={`w-4 h-4 transition-transform group-hover:translate-x-1 ${isActive ? 'text-[#C5A059]' : 'text-neutral-500'}`} />
+                      </button>
+                    );
+                  })}
+
+                  {/* Monte seu Kit de Bolso */}
+                  {onOpenTrioBuilder && (
                     <button
-                      key={item.label}
-                      onClick={() => handleNavClick(item.value)}
-                      className="w-full text-left py-3 px-2 text-sm font-light tracking-[0.2em] uppercase text-neutral-800 hover:bg-neutral-50 hover:pl-4 transition-all flex items-center justify-between border-b border-neutral-50"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        onOpenTrioBuilder();
+                      }}
+                      className="w-full text-left py-3 px-1 text-sm tracking-[0.15em] uppercase text-[#E0C078] hover:text-white font-bold transition-all flex items-center justify-between group cursor-pointer hover:pl-2"
                     >
-                      <span>{item.label}</span>
-                      <ChevronRight className="w-4 h-4 text-neutral-300" />
+                      <span className="truncate">🎁 Monte seu Kit de Bolso (3x 15ml)</span>
+                      <ChevronRight className="w-4 h-4 text-[#C5A059] transition-transform group-hover:translate-x-1" />
                     </button>
-                  ))}
-                </div>
+                  )}
 
-                <div className="mt-6 pt-6 border-t border-neutral-100 space-y-3">
-                  <button
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      onOpenSearch();
-                    }}
-                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-neutral-100 text-neutral-900 rounded-lg text-xs font-medium uppercase tracking-wider cursor-pointer"
-                  >
-                    <Search className="w-4 h-4 text-[#C5A059]" />
-                    <span>Buscar Perfume Equivalente</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      onOpenQuiz();
-                    }}
-                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-neutral-950 text-white rounded-lg text-xs font-medium uppercase tracking-wider cursor-pointer"
-                  >
-                    <Sparkles className="w-4 h-4 text-[#C5A059]" />
-                    <span>Descubra Seu Perfume Ideal (Quiz)</span>
-                  </button>
-
+                  {/* Política de Compras */}
                   {onOpenPolicy && (
                     <button
                       onClick={() => {
                         setIsMobileMenuOpen(false);
                         onOpenPolicy();
                       }}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs font-semibold uppercase tracking-wider cursor-pointer"
+                      className="w-full text-left py-3 px-1 text-sm tracking-[0.15em] uppercase text-neutral-300 hover:text-white font-medium transition-all flex items-center justify-between group cursor-pointer hover:pl-2"
                     >
-                      <span>📜 Política de Compras SWISS ATELIER</span>
+                      <span className="truncate">📜 Política de Compras SWISS ATELIER</span>
+                      <ChevronRight className="w-4 h-4 text-neutral-500 transition-transform group-hover:translate-x-1" />
                     </button>
                   )}
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-neutral-100 text-center">
-                <p className="text-[11px] text-neutral-500 tracking-wider">
-                  Consultoria via WhatsApp disponível 24h
+              {/* Rodapé discreto */}
+              <div className="pt-4 border-t border-white/10 mt-4 text-center">
+                <p className="text-[10px] text-[#C5A059] tracking-[0.2em] uppercase font-mono">
+                  Essências Importadas 36% Concentração
                 </p>
-                <a
-                  href="https://wa.me/5554999893370?text=Ol%C3%A1,%20gostaria%20de%20ajuda%20para%20escolher%20meu%20perfume%20na%20Perfumes%20Premium%20Swiss."
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-emerald-800 hover:underline tracking-wider uppercase"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Falar com Perfumista</span>
-                </a>
               </div>
             </motion.div>
           </>
