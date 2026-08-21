@@ -1,6 +1,7 @@
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getFirestore,
+  initializeFirestore,
   collection,
   doc,
   onSnapshot,
@@ -51,27 +52,21 @@ const app = getApps().length === 0
   : getApps()[0];
 
 // The primary target Firestore Database ID from the stock app URL
-const stockAppDbId = 'ai-studio-79c8f0b3-973d-460a-a7bd-65f19a2fa2e1';
+export const stockAppDbId = 'ai-studio-79c8f0b3-973d-460a-a7bd-65f19a2fa2e1';
 
-const KNOWN_DB_IDS = [
-  stockAppDbId,
-  'ai-studio-perfumespremiums-6b624074-dcce-4860-ae88-a993437e77d4',
-  'ai-studio-17618b9e-e7f0-4f06-a97d-e8f3beb2a9ed',
-  'ai-studio-7dedab88-7035-4b33-b9c6-c1d7d93b354c',
-  'ai-studio-d8993257-87b4-4958-96a8-af55f8c41b78',
-  'ai-studio-dadc6e28-d8ba-4abf-9c7b-57bf06cd736b'
-];
+function getOrInitFirestore(appInstance: any, dbId: string) {
+  try {
+    return initializeFirestore(appInstance, {
+      experimentalAutoDetectLongPolling: true
+    }, dbId);
+  } catch (_e) {
+    return getFirestore(appInstance, dbId);
+  }
+}
 
-export const defaultDb = getFirestore(app);
-export const db = getFirestore(app, stockAppDbId);
-
-export const allFirestoreInstances = [
-  db,
-  defaultDb,
-  ...KNOWN_DB_IDS.map((id) => {
-    try { return getFirestore(app, id); } catch { return null; }
-  }).filter(Boolean) as any[]
-];
+export const db = getOrInitFirestore(app, stockAppDbId);
+export const defaultDb = db;
+export const allFirestoreInstances = [db];
 
 export const rtdb = getDatabase(app);
 
