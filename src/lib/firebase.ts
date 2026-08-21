@@ -57,7 +57,7 @@ export const stockAppDbId = 'ai-studio-79c8f0b3-973d-460a-a7bd-65f19a2fa2e1';
 function getOrInitFirestore(appInstance: any, dbId: string) {
   try {
     return initializeFirestore(appInstance, {
-      experimentalAutoDetectLongPolling: true
+      experimentalForceLongPolling: true
     }, dbId);
   } catch (_e) {
     return getFirestore(appInstance, dbId);
