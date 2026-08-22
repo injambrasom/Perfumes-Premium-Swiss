@@ -135,6 +135,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [orderId, setOrderId] = useState('');
+  const [isSearchingCep, setIsSearchingCep] = useState(false);
+  const [cepErrorMsg, setCepErrorMsg] = useState<string | null>(null);
 
   // Discount for PIX (5% OFF)
   const pixDiscount = paymentMethod === 'pix' ? subtotal * 0.05 : 0;
@@ -225,18 +227,55 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     handleInputChange('phone', v);
   };
 
+  const searchCepAddress = async (cleanCep: string) => {
+    if (cleanCep.length !== 8) return;
+    setIsSearchingCep(true);
+    setCepErrorMsg(null);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      if (!response.ok) throw new Error('Falha ao consultar CEP');
+      const data = await response.json();
+      if (data.erro) {
+        setCepErrorMsg('CEP não localizado. Por favor, preencha o endereço manualmente.');
+        setIsSearchingCep(false);
+        return;
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        street: data.logradouro || prev.street,
+        neighborhood: data.bairro || prev.neighborhood,
+        city: data.localidade || prev.city,
+        state: data.uf || prev.state,
+      }));
+
+      // Clear any validation errors for auto-filled address fields
+      setFormErrors((prev) => {
+        const next = { ...prev };
+        delete next.cep;
+        if (data.logradouro) delete next.street;
+        if (data.localidade) delete next.city;
+        return next;
+      });
+    } catch (err) {
+      console.error('Erro na consulta do CEP:', err);
+      setCepErrorMsg('Não foi possível buscar o endereço automaticamente. Preencha os campos abaixo.');
+    } finally {
+      setIsSearchingCep(false);
+    }
+  };
+
   const handleCepChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let v = e.target.value.replace(/\D/g, '');
     if (v.length > 8) v = v.substring(0, 8);
+    const cleanDigits = v;
     v = v.replace(/^(\d{5})(\d)/, '$1-$2');
     handleInputChange('cep', v);
 
-    // Auto simulate CEP fill if 8 digits
-    if (v.replace(/\D/g, '').length === 8) {
-      handleInputChange('street', 'Avenida Paulista');
-      handleInputChange('neighborhood', 'Bela Vista');
-      handleInputChange('city', 'São Paulo');
-      handleInputChange('state', 'SP');
+    if (cleanDigits.length === 8) {
+      searchCepAddress(cleanDigits);
+    } else {
+      setCepErrorMsg(null);
     }
   };
 
@@ -517,6 +556,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const handleWhatsAppNotify = () => {
     const itemsList = items.map(i => `• ${i.product.name} (${i.selectedSize || '100ml'}) - R$ ${i.selectedPrice.toFixed(2)} x${i.quantity}`).join('\n');
+    const installmentPlan = paymentMethod === 'credit_card' 
+      ? getInstallmentInfo(formData.installments).label 
+      : 'PIX (Aprovado/Comprovante)';
+
     const message = `*NOVO PEDIDO DIRECT - PERFUMES PREMIUM SWISS*\n\n` +
       `*Número do Pedido:* ${orderId}\n` +
       `*Cliente:* ${formData.name}\n` +
@@ -527,48 +570,70 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       `${formData.street}, Nº ${formData.number}${formData.complement ? ` (${formData.complement})` : ''}\n` +
       `${formData.neighborhood} - ${formData.city}/${formData.state} - CEP ${formData.cep}\n\n` +
       `*Itens do Pedido:*\n${itemsList}\n\n` +
-      `*Forma de Pagamento:* ${paymentMethod === 'pix' ? 'PIX (Aprovado/Comprovante)' : 'Cartão de Crédito'}\n` +
+      `*Forma de Pagamento:* ${installmentPlan}\n` +
       `*Total do Pedido:* R$ ${finalTotal.toFixed(2).replace('.', ',')}\n\n` +
       `Gostaria de acompanhar o envio e código de rastreio!`;
 
     window.open(`https://wa.me/5554999893370?text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  // Generate 1x to 12x options (1x e 2x sem juros, a partir de 3x com juros padrão da operadora)
+  // Detailed Installment calculation helper (1x e 2x sem juros, 3x a 12x com juros normais da operadora)
+  const getInstallmentInfo = (installmentCount: number | string) => {
+    const count = Math.max(1, Math.min(12, Number(installmentCount) || 1));
+    if (count === 1) {
+      return {
+        count: 1,
+        installmentValue: finalTotal,
+        total: finalTotal,
+        hasInterest: false,
+        label: `1x de R$ ${finalTotal.toFixed(2).replace('.', ',')} sem juros (À vista)`,
+        shortLabel: `1x de R$ ${finalTotal.toFixed(2).replace('.', ',')} (À vista)`,
+        buttonLabel: `Pagar R$ ${finalTotal.toFixed(2).replace('.', ',')} à vista no Cartão`,
+      };
+    }
+    if (count === 2) {
+      const val = finalTotal / 2;
+      return {
+        count: 2,
+        installmentValue: val,
+        total: finalTotal,
+        hasInterest: false,
+        label: `2x de R$ ${val.toFixed(2).replace('.', ',')} sem juros`,
+        shortLabel: `2x de R$ ${val.toFixed(2).replace('.', ',')} sem juros`,
+        buttonLabel: `Pagar em 2x de R$ ${val.toFixed(2).replace('.', ',')} sem juros no Cartão`,
+      };
+    }
+    const baseInterestRate = 0.0299;
+    const factor = (baseInterestRate * Math.pow(1 + baseInterestRate, count)) / (Math.pow(1 + baseInterestRate, count) - 1);
+    const installmentVal = finalTotal * factor;
+    const totalVal = installmentVal * count;
+    return {
+      count,
+      installmentValue: installmentVal,
+      total: totalVal,
+      hasInterest: true,
+      label: `${count}x de R$ ${installmentVal.toFixed(2).replace('.', ',')} (Total R$ ${totalVal.toFixed(2).replace('.', ',')})`,
+      shortLabel: `${count}x de R$ ${installmentVal.toFixed(2).replace('.', ',')}`,
+      buttonLabel: `Pagar em ${count}x de R$ ${installmentVal.toFixed(2).replace('.', ',')} no Cartão`,
+    };
+  };
+
+  // Generate 1x to 12x options with guaranteed visible styling
   const getInstallmentOptions = () => {
-    const options = [];
-    
-    // 1x à vista
-    options.push(
-      <option key="1" value="1">
-        1x de R$ {finalTotal.toFixed(2).replace('.', ',')} sem juros (À vista)
-      </option>
-    );
-
-    // 2x sem juros
-    const val2x = (finalTotal / 2).toFixed(2).replace('.', ',');
-    options.push(
-      <option key="2" value="2">
-        2x de R$ {val2x} sem juros
-      </option>
-    );
-
-    // 3x a 12x com juros normais da operadora/Mercado Pago
-    // Coeficiente médio estimado de juros padrão de cartão nacional (~2.99% a.m.)
-    for (let i = 3; i <= 12; i++) {
-      const baseInterestRate = 0.0299;
-      // Fórmula de amortização Price simplificada para valor aproximado da parcela com juros normais
-      const factor = (baseInterestRate * Math.pow(1 + baseInterestRate, i)) / (Math.pow(1 + baseInterestRate, i) - 1);
-      const installmentWithInterest = (finalTotal * factor).toFixed(2).replace('.', ',');
-      const totalWithInterest = (Number(installmentWithInterest.replace(',', '.')) * i).toFixed(2).replace('.', ',');
-      
-      options.push(
-        <option key={i} value={i.toString()}>
-          {i}x de R$ {installmentWithInterest} (Total R$ {totalWithInterest})
+    return Array.from({ length: 12 }, (_, idx) => {
+      const count = idx + 1;
+      const info = getInstallmentInfo(count);
+      return (
+        <option 
+          key={count} 
+          value={count.toString()}
+          className="bg-white text-neutral-900 py-1.5"
+          style={{ color: '#171717', backgroundColor: '#ffffff' }}
+        >
+          {info.label}
         </option>
       );
-    }
-    return options;
+    });
   };
 
   return (
@@ -795,12 +860,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                   <div>
-                    <label className="block text-neutral-700 font-medium mb-1">
-                      CEP *
+                    <label className="block text-neutral-700 font-medium mb-1 flex items-center justify-between">
+                      <span>CEP *</span>
+                      {isSearchingCep && (
+                        <span className="text-[10px] text-[#C5A059] font-normal flex items-center gap-1 animate-pulse">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059] animate-ping inline-block" />
+                          Buscando...
+                        </span>
+                      )}
                     </label>
                     <input
                       type="text"
                       placeholder="00000-000"
+                      maxLength={9}
                       value={formData.cep}
                       onChange={handleCepChange}
                       className={`w-full px-3 py-2 rounded border bg-white text-neutral-900 font-sans text-xs focus:outline-none transition-colors ${
@@ -808,6 +880,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       }`}
                     />
                     {formErrors.cep && <p className="text-[10px] text-red-500 mt-0.5">{formErrors.cep}</p>}
+                    {cepErrorMsg && <p className="text-[10px] text-amber-600 mt-0.5">{cepErrorMsg}</p>}
                   </div>
 
                   <div className="sm:col-span-2">
@@ -1053,16 +1126,39 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-neutral-700 font-medium mb-1">
-                        Opções de Parcelamento *
-                      </label>
-                      <select
-                        value={formData.installments}
-                        onChange={(e) => handleInputChange('installments', e.target.value)}
-                        className="w-full px-3 py-2 rounded border border-neutral-300 font-sans text-xs focus:outline-none focus:border-[#C5A059] bg-white"
-                      >
-                        {getInstallmentOptions()}
-                      </select>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-neutral-700 font-medium">
+                          Opções de Parcelamento *
+                        </label>
+                        <span className="text-[10px] text-neutral-500 font-normal">
+                          {Number(formData.installments) <= 2 ? 'Sem juros' : 'Com juros da operadora'}
+                        </span>
+                      </div>
+                      
+                      <div className="relative">
+                        <select
+                          value={formData.installments}
+                          onChange={(e) => handleInputChange('installments', e.target.value)}
+                          className="w-full px-3 py-2.5 rounded border border-neutral-300 font-sans text-xs focus:outline-none focus:border-[#C5A059] bg-white text-neutral-900 font-medium cursor-pointer shadow-xs appearance-none pr-8"
+                          style={{ color: '#171717', backgroundColor: '#ffffff' }}
+                        >
+                          {getInstallmentOptions()}
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-neutral-600">
+                          <ChevronDown className="w-4 h-4" />
+                        </div>
+                      </div>
+
+                      {/* Feedback box showing the active installment selection */}
+                      <div className="mt-2 p-2.5 rounded-lg bg-neutral-50 border border-neutral-200 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5 text-neutral-600 font-light">
+                          <CreditCard className="w-3.5 h-3.5 text-[#C5A059]" />
+                          <span>Parcelamento:</span>
+                        </div>
+                        <span className="font-semibold text-neutral-900 text-[11px] sm:text-xs">
+                          {getInstallmentInfo(formData.installments).label}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1082,7 +1178,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   ) : (
                     <>
                       <Lock className="w-4 h-4 text-[#C5A059]" />
-                      <span>Pagar R$ {finalTotal.toFixed(2).replace('.', ',')} no Cartão</span>
+                      <span>{getInstallmentInfo(formData.installments).buttonLabel}</span>
                     </>
                   )}
                 </button>
