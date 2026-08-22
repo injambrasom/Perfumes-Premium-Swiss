@@ -190,7 +190,28 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return () => clearInterval(interval);
   }, [step, pixPaymentId, onClearCart]);
 
-  if (!isOpen) return null;
+  // Safety watchdog: ensure 'processing' never gets stuck indefinitely
+  useEffect(() => {
+    let watchdog: NodeJS.Timeout;
+    if (step === 'processing') {
+      watchdog = setTimeout(() => {
+        console.warn('[CHECKOUT]: Safety watchdog triggered - forcing transition to success/pix.');
+        if (paymentMethod === 'pix') {
+          setPixQrCodeString((prev) => prev || generateValidPixPayload(finalTotal));
+          setStep('pix_generated');
+          setTimer(900);
+        } else {
+          try {
+            onClearCart();
+          } catch {
+            // ignore
+          }
+          setStep('success');
+        }
+      }, 3500);
+    }
+    return () => clearTimeout(watchdog);
+  }, [step, paymentMethod, finalTotal, onClearCart]);
 
   const formatTimer = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -387,29 +408,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
-
-  // Safety watchdog: ensure 'processing' never gets stuck indefinitely
-  useEffect(() => {
-    let watchdog: NodeJS.Timeout;
-    if (step === 'processing') {
-      watchdog = setTimeout(() => {
-        console.warn('[CHECKOUT]: Safety watchdog triggered - forcing transition to success/pix.');
-        if (paymentMethod === 'pix') {
-          setPixQrCodeString((prev) => prev || generateValidPixPayload(finalTotal));
-          setStep('pix_generated');
-          setTimer(900);
-        } else {
-          try {
-            onClearCart();
-          } catch {
-            // ignore
-          }
-          setStep('success');
-        }
-      }, 3500);
-    }
-    return () => clearTimeout(watchdog);
-  }, [step, paymentMethod, finalTotal, onClearCart]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -692,6 +690,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       );
     });
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-fadeIn">
