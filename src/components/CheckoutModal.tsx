@@ -534,14 +534,37 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     window.open(`https://wa.me/5554999893370?text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  // Generate 1x to 12x options
+  // Generate 1x to 12x options (1x e 2x sem juros, a partir de 3x com juros padrão da operadora)
   const getInstallmentOptions = () => {
     const options = [];
-    for (let i = 1; i <= 12; i++) {
-      const val = (finalTotal / i).toFixed(2).replace('.', ',');
+    
+    // 1x à vista
+    options.push(
+      <option key="1" value="1">
+        1x de R$ {finalTotal.toFixed(2).replace('.', ',')} sem juros (À vista)
+      </option>
+    );
+
+    // 2x sem juros
+    const val2x = (finalTotal / 2).toFixed(2).replace('.', ',');
+    options.push(
+      <option key="2" value="2">
+        2x de R$ {val2x} sem juros
+      </option>
+    );
+
+    // 3x a 12x com juros normais da operadora/Mercado Pago
+    // Coeficiente médio estimado de juros padrão de cartão nacional (~2.99% a.m.)
+    for (let i = 3; i <= 12; i++) {
+      const baseInterestRate = 0.0299;
+      // Fórmula de amortização Price simplificada para valor aproximado da parcela com juros normais
+      const factor = (baseInterestRate * Math.pow(1 + baseInterestRate, i)) / (Math.pow(1 + baseInterestRate, i) - 1);
+      const installmentWithInterest = (finalTotal * factor).toFixed(2).replace('.', ',');
+      const totalWithInterest = (Number(installmentWithInterest.replace(',', '.')) * i).toFixed(2).replace('.', ',');
+      
       options.push(
         <option key={i} value={i.toString()}>
-          {i}x de R$ {val} sem juros {i === 1 ? '(À vista)' : ''}
+          {i}x de R$ {installmentWithInterest} (Total R$ {totalWithInterest})
         </option>
       );
     }
@@ -930,11 +953,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         </span>
                       </div>
                       <span className="bg-neutral-100 text-neutral-700 text-[10px] font-medium px-2 py-0.5 rounded uppercase">
-                        Até 12x
+                        Até 2x sem juros
                       </span>
                     </div>
                     <p className="text-[11px] text-neutral-500 font-light leading-tight">
-                      Parcelamento sem juros em todas as bandeiras.
+                      Em até 2x sem juros ou até 12x com juros da operadora.
                     </p>
                   </button>
                 </div>

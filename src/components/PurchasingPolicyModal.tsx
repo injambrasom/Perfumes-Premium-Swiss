@@ -116,7 +116,7 @@ export const PurchasingPolicyModal: React.FC<PurchasingPolicyModalProps> = ({ is
                   <strong className="text-white">Pix:</strong> pagamento instantâneo com aprovação em até 5 minutos e desconto exclusivo concedido no checkout.
                 </li>
                 <li>
-                  <strong className="text-white">Cartão de Crédito:</strong> parcelamento em até 12x (com juros a partir de 3x, conforme a operadora do cartão).
+                  <strong className="text-white">Cartão de Crédito:</strong> parcelamento em até 2x sem juros ou até 12x com juros normais da operadora.
                 </li>
               </ul>
               <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-200 text-xs">
