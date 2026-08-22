@@ -341,7 +341,7 @@ export async function deductStockInFirebase(
 }
 
 /**
- * Save an order to Firestore in real-time
+ * Save an order to Firestore in real-time with timeout protection
  */
 export async function saveOrderToFirebase(orderData: Omit<Order, 'id'> & { id?: string }): Promise<string> {
   const generatedId = orderData.id || `order_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -352,41 +352,47 @@ export async function saveOrderToFirebase(orderData: Omit<Order, 'id'> & { id?: 
     createdAt: orderData.createdAt || new Date().toISOString()
   };
 
+  // Always save to localStorage immediately for instant resilience
   try {
-    // Save to primary Firestore db instance
-    const docRef = doc(db, 'orders', generatedId);
-    await setDoc(docRef, orderDoc);
+    const localOrders = JSON.parse(localStorage.getItem('swiss_orders_backup') || '[]');
+    const exists = localOrders.some((o: Order) => o.id === generatedId);
+    if (!exists) {
+      localOrders.unshift(orderDoc);
+      localStorage.setItem('swiss_orders_backup', JSON.stringify(localOrders.slice(0, 100)));
+    }
+  } catch {
+    // ignore
+  }
 
-    // Also backup to default Firestore if different
-    if (defaultDb !== db) {
+  // Save to Firestore and RTDB with a maximum 2.5s timeout
+  const firestorePromise = (async () => {
+    try {
+      const docRef = doc(db, 'orders', generatedId);
+      await setDoc(docRef, orderDoc);
+
+      if (defaultDb !== db) {
+        try {
+          const defaultDocRef = doc(defaultDb, 'orders', generatedId);
+          await setDoc(defaultDocRef, orderDoc);
+        } catch {
+          // ignore
+        }
+      }
+
       try {
-        const defaultDocRef = doc(defaultDb, 'orders', generatedId);
-        await setDoc(defaultDocRef, orderDoc);
+        await rtdbSet(rtdbRef(rtdb, `orders/${generatedId}`), orderDoc);
       } catch {
         // ignore
       }
+    } catch (error) {
+      console.error('[FIREBASE]: Error saving order to Firestore:', error);
     }
+  })();
 
-    // Save to Realtime Database as redundant backup
-    try {
-      await rtdbSet(rtdbRef(rtdb, `orders/${generatedId}`), orderDoc);
-    } catch {
-      // ignore
-    }
+  const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 2500));
+  await Promise.race([firestorePromise, timeoutPromise]);
 
-    return generatedId;
-  } catch (error) {
-    console.error('[FIREBASE]: Error saving order to Firestore:', error);
-    // Fallback: save to localStorage if offline
-    try {
-      const localOrders = JSON.parse(localStorage.getItem('swiss_orders_backup') || '[]');
-      localOrders.unshift(orderDoc);
-      localStorage.setItem('swiss_orders_backup', JSON.stringify(localOrders));
-    } catch {
-      // ignore
-    }
-    return generatedId;
-  }
+  return generatedId;
 }
 
 /**
