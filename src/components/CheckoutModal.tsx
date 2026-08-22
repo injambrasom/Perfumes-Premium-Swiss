@@ -111,7 +111,29 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [pixQrCodeBase64, setPixQrCodeBase64] = useState<string | null>(null);
   const [pixQrCodeString, setPixQrCodeString] = useState<string | null>(null);
   const [pixPaymentId, setPixPaymentId] = useState<string | number | null>(null);
+  const [mpInitPoint, setMpInitPoint] = useState<string | null>(null);
   const [mpError, setMpError] = useState<string | null>(null);
+
+  // Snapshot of submitted order to prevent items being wiped out by onClearCart
+  const [submittedOrderInfo, setSubmittedOrderInfo] = useState<{
+    orderId: string;
+    total: number;
+    subtotal: number;
+    shipping: number;
+    discount: number;
+    paymentMethod: PaymentMethod;
+    installmentLabel: string;
+    installmentShortLabel: string;
+    name: string;
+    street: string;
+    number: string;
+    city: string;
+    state: string;
+    phone: string;
+    email: string;
+    cpf: string;
+    items: CartItem[];
+  } | null>(null);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -419,6 +441,30 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     const currentOrderId = orderId || `SWISS-${Math.floor(10000 + Math.random() * 90000)}`;
     const cleanCardLast4 = formData.cardNumber ? formData.cardNumber.replace(/\D/g, '').slice(-4) : '';
     const installmentData = getInstallmentInfo(formData.installments);
+    const snapshotDiscount = paymentMethod === 'pix' ? (subtotal * 0.05) : 0;
+    const snapshotTotal = Math.max(0, (subtotal + freightCost) - snapshotDiscount);
+    const snapshotItems = [...items];
+
+    // Freeze snapshot so clearing cart won't zero out totals on success screen
+    setSubmittedOrderInfo({
+      orderId: currentOrderId,
+      total: snapshotTotal,
+      subtotal: subtotal,
+      shipping: freightCost,
+      discount: snapshotDiscount,
+      paymentMethod: paymentMethod,
+      installmentLabel: installmentData.label,
+      installmentShortLabel: installmentData.shortLabel,
+      name: formData.name.trim(),
+      street: formData.street.trim(),
+      number: formData.number.trim(),
+      city: formData.city.trim(),
+      state: formData.state.trim(),
+      phone: formData.phone.trim(),
+      email: formData.email.trim(),
+      cpf: formData.cpf.trim(),
+      items: snapshotItems
+    });
 
     const fullOrderPayload: Omit<Order, 'id'> & { id: string } = {
       id: currentOrderId,
@@ -437,7 +483,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         city: formData.city.trim(),
         state: formData.state.trim()
       },
-      items: items.map((i) => ({
+      items: snapshotItems.map((i) => ({
         productId: i.product.id,
         name: i.product.name,
         referenceName: i.product.referenceName,
@@ -448,8 +494,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       })),
       subtotal: subtotal,
       shipping: freightCost,
-      discount: Math.max(0, (subtotal + freightCost) - finalTotal),
-      total: finalTotal,
+      discount: snapshotDiscount,
+      total: snapshotTotal,
       paymentMethod: paymentMethod,
       status: paymentMethod === 'credit_card' ? 'pago' : 'pendente'
     };
@@ -483,7 +529,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,
           body: JSON.stringify({
-            transaction_amount: finalTotal,
+            transaction_amount: snapshotTotal,
             description: `Perfumes Premium Swiss - Pedido ${currentOrderId}`,
             payer: {
               email: formData.email,
@@ -503,7 +549,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           const data = await response.json().catch(() => null);
           if (data && data.success) {
             setPixQrCodeBase64(data.qr_code_base64 || null);
-            setPixQrCodeString(data.qr_code || generateValidPixPayload(finalTotal));
+            setPixQrCodeString(data.qr_code || generateValidPixPayload(snapshotTotal));
             setPixPaymentId(data.id || null);
             setStep('pix_generated');
             setTimer(900);
@@ -512,31 +558,30 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         }
 
         // Fallback for Pix QR Code
-        setPixQrCodeString(generateValidPixPayload(finalTotal));
+        setPixQrCodeString(generateValidPixPayload(snapshotTotal));
         setStep('pix_generated');
         setTimer(900);
       } catch (err: any) {
         console.error('Error creating MP Pix:', err);
-        setPixQrCodeString(generateValidPixPayload(finalTotal));
+        setPixQrCodeString(generateValidPixPayload(snapshotTotal));
         setStep('pix_generated');
         setTimer(900);
       }
     } else {
-      // CREDIT CARD PROCESSING FLOW
+      // CREDIT CARD PROCESSING FLOW (MERCADO PAGO)
       try {
-        // Subtle 1.2s smooth security processing animation
-        await new Promise((resolve) => setTimeout(resolve, 1200));
-
-        // Try Mercado Pago preference API in background with quick timeout
+        let directCheckoutUrl: string | null = null;
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 2000);
-          fetch('/api/mercadopago/create-preference', {
+          const timeoutId = setTimeout(() => controller.abort(), 3500);
+          const response = await fetch('/api/mercadopago/create-preference', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             signal: controller.signal,
             body: JSON.stringify({
-              items,
+              items: snapshotItems,
+              total: snapshotTotal,
+              shippingCost: freightCost,
               payer: {
                 ...formData,
                 cardLast4: cleanCardLast4,
@@ -547,6 +592,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             })
           }).catch(() => null);
           clearTimeout(timeoutId);
+
+          if (response && response.ok) {
+            const data = await response.json().catch(() => null);
+            if (data && data.init_point) {
+              directCheckoutUrl = data.init_point;
+              setMpInitPoint(data.init_point);
+              // Open official Mercado Pago checkout window for direct debit
+              try {
+                window.open(data.init_point, '_blank');
+              } catch {
+                // ignore popup blocker
+              }
+            }
+          }
         } catch {
           // ignore
         }
@@ -572,7 +631,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const syncInventoryDeduction = async () => {
     try {
-      const formattedItems = items.map((i) => ({
+      const activeItems = submittedOrderInfo?.items || items;
+      const formattedItems = activeItems.map((i) => ({
         productId: i.product.id,
         size: (i.selectedSize || '100ml') as '15ml' | '55ml' | '100ml',
         quantity: i.quantity
@@ -592,7 +652,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const handleCopyPix = () => {
-    const pixCode = pixQrCodeString || generateValidPixPayload(finalTotal);
+    const activeTotal = submittedOrderInfo?.total || finalTotal;
+    const pixCode = pixQrCodeString || generateValidPixPayload(activeTotal);
     navigator.clipboard.writeText(pixCode);
     setCopiedPix(true);
     setTimeout(() => setCopiedPix(false), 3000);
@@ -600,8 +661,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const handleConfirmPixPayment = async () => {
     syncInventoryDeduction();
+    const activeOrderId = submittedOrderInfo?.orderId || orderId;
     try {
-      await updateOrderStatusInFirebase(orderId, 'pago');
+      await updateOrderStatusInFirebase(activeOrderId, 'pago');
     } catch {
       // ignore
     }
@@ -610,23 +672,36 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const handleWhatsAppNotify = () => {
-    const itemsList = items.map(i => `• ${i.product.name} (${i.selectedSize || '100ml'}) - R$ ${i.selectedPrice.toFixed(2)} x${i.quantity}`).join('\n');
+    const activeItems = submittedOrderInfo?.items?.length ? submittedOrderInfo.items : items;
+    const activeTotal = submittedOrderInfo?.total !== undefined ? submittedOrderInfo.total : finalTotal;
+    const activeOrderId = submittedOrderInfo?.orderId || orderId;
+    const activeName = submittedOrderInfo?.name || formData.name;
+    const activeCpf = submittedOrderInfo?.cpf || formData.cpf;
+    const activeEmail = submittedOrderInfo?.email || formData.email;
+    const activePhone = submittedOrderInfo?.phone || formData.phone;
+    const activeStreet = submittedOrderInfo?.street || formData.street;
+    const activeNumber = submittedOrderInfo?.number || formData.number;
+    const activeCity = submittedOrderInfo?.city || formData.city;
+    const activeState = submittedOrderInfo?.state || formData.state;
+    const activeCep = formData.cep;
+
+    const itemsList = activeItems.map(i => `• ${i.product.name} (${i.selectedSize || '100ml'}) - R$ ${i.selectedPrice.toFixed(2)} x${i.quantity}`).join('\n');
     const installmentPlan = paymentMethod === 'credit_card' 
-      ? getInstallmentInfo(formData.installments).label 
+      ? (submittedOrderInfo?.installmentLabel || getInstallmentInfo(formData.installments).label)
       : 'PIX (Aprovado/Comprovante)';
 
     const message = `*NOVO PEDIDO DIRECT - PERFUMES PREMIUM SWISS*\n\n` +
-      `*Número do Pedido:* ${orderId}\n` +
-      `*Cliente:* ${formData.name}\n` +
-      `*CPF:* ${formData.cpf}\n` +
-      `*E-mail:* ${formData.email}\n` +
-      `*WhatsApp:* ${formData.phone}\n\n` +
+      `*Número do Pedido:* ${activeOrderId}\n` +
+      `*Cliente:* ${activeName}\n` +
+      `*CPF:* ${activeCpf}\n` +
+      `*E-mail:* ${activeEmail}\n` +
+      `*WhatsApp:* ${activePhone}\n\n` +
       `*Endereço de Entrega:*\n` +
-      `${formData.street}, Nº ${formData.number}${formData.complement ? ` (${formData.complement})` : ''}\n` +
-      `${formData.neighborhood} - ${formData.city}/${formData.state} - CEP ${formData.cep}\n\n` +
+      `${activeStreet}, Nº ${activeNumber}${formData.complement ? ` (${formData.complement})` : ''}\n` +
+      `${formData.neighborhood || ''} - ${activeCity}/${activeState} - CEP ${activeCep}\n\n` +
       `*Itens do Pedido:*\n${itemsList}\n\n` +
       `*Forma de Pagamento:* ${installmentPlan}\n` +
-      `*Total do Pedido:* R$ ${finalTotal.toFixed(2).replace('.', ',')}\n\n` +
+      `*Total do Pedido:* R$ ${activeTotal.toFixed(2).replace('.', ',')}\n\n` +
       `Gostaria de acompanhar o envio e código de rastreio!`;
 
     window.open(`https://wa.me/5554999893370?text=${encodeURIComponent(message)}`, '_blank');
@@ -1384,10 +1459,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
               <div className="space-y-4">
                 <span className="text-[11px] font-mono tracking-widest text-[#C5A059] uppercase font-semibold">
-                  Pedido Confirmado #{orderId}
+                  Pedido Confirmado #{submittedOrderInfo?.orderId || orderId}
                 </span>
                 <h3 className="font-serif text-2xl font-bold text-neutral-900">
-                  {paymentMethod === 'pix' ? 'Pedido Registrado com Sucesso!' : 'Pagamento Aprovado com Sucesso!'}
+                  {paymentMethod === 'pix' ? 'Pedido Registrado com Sucesso!' : 'Pedido Confirmado com Sucesso!'}
                 </h3>
                 <div className="bg-emerald-50 border-2 border-emerald-500/20 p-4 rounded-xl max-w-md mx-auto shadow-sm">
                   <p className="text-sm text-emerald-800 font-medium leading-relaxed">
@@ -1400,37 +1475,51 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 text-left text-xs space-y-3 max-w-md mx-auto">
                 <div className="flex justify-between items-center pb-2 border-b border-neutral-200 font-serif font-semibold">
                   <span>Resumo do Pedido</span>
-                  <span className="text-[#C5A059]">{orderId}</span>
+                  <span className="text-[#C5A059]">{submittedOrderInfo?.orderId || orderId}</span>
                 </div>
 
                 <div className="space-y-1.5 text-neutral-700 font-sans">
                   <div className="flex justify-between">
                     <span className="text-neutral-500">Cliente:</span>
-                    <span className="font-medium">{formData.name}</span>
+                    <span className="font-medium">{submittedOrderInfo?.name || formData.name}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-neutral-500">Entrega para:</span>
                     <span className="font-medium text-right max-w-[200px] truncate">
-                      {formData.street}, {formData.number} - {formData.city}/{formData.state}
+                      {submittedOrderInfo?.street || formData.street}, {submittedOrderInfo?.number || formData.number} - {submittedOrderInfo?.city || formData.city}/{submittedOrderInfo?.state || formData.state}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-neutral-500">Pagamento:</span>
                     <span className="font-medium text-right">
-                      {paymentMethod === 'pix' ? 'PIX (Aprovação Instantânea)' : `Cartão (${getInstallmentInfo(formData.installments).shortLabel})`}
+                      {paymentMethod === 'pix' 
+                        ? 'PIX (Aprovação Instantânea)' 
+                        : `Cartão (${submittedOrderInfo?.installmentShortLabel || getInstallmentInfo(formData.installments).shortLabel})`}
                     </span>
                   </div>
                   <div className="flex justify-between font-bold pt-2 border-t border-neutral-200 text-neutral-900">
-                    <span>Total Pago:</span>
+                    <span>Total do Pedido:</span>
                     <span className="font-mono text-[#C5A059]">
-                      R$ {finalTotal.toFixed(2).replace('.', ',')}
+                      R$ {(submittedOrderInfo?.total !== undefined ? submittedOrderInfo.total : finalTotal).toFixed(2).replace('.', ',')}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* WhatsApp Notification & Actions */}
-              <div className="space-y-3 max-w-md mx-auto pt-4">
+              {/* Action Buttons */}
+              <div className="space-y-3 max-w-md mx-auto pt-2">
+                {mpInitPoint && paymentMethod === 'credit_card' && (
+                  <a
+                    href={mpInitPoint}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full bg-[#009EE3] hover:bg-[#0081b8] text-white py-3.5 px-6 rounded-xl font-sans text-xs uppercase tracking-wider font-bold transition-all shadow-md flex items-center justify-center gap-2"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    <span>Concluir Pagamento no Mercado Pago</span>
+                  </a>
+                )}
+
                 <button
                   onClick={handleWhatsAppNotify}
                   className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white py-4 px-6 rounded-xl font-sans text-sm uppercase tracking-wider font-bold transition-all shadow-xl shadow-[#25D366]/20 flex items-center justify-center gap-3 cursor-pointer animate-pulse hover:animate-none"

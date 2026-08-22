@@ -678,36 +678,79 @@ app.post('/api/mercadopago/create-preference', async (req, res) => {
       });
     }
 
-    const { items, payer, orderId } = req.body;
+    const { items, payer, orderId, shippingCost, total } = req.body;
 
     const mpItems = (items || []).map((item: any) => ({
-      id: item.product?.id || 'PERFUME-SWISS',
-      title: `${item.product?.name || 'Perfume'} (${item.selectedSize || '100ml'})`,
-      description: item.product?.referenceName || 'Perfumes Premium Swiss Atelier',
-      quantity: item.quantity || 1,
-      unit_price: Number(item.selectedPrice || item.product?.price || 0),
+      id: String(item.productId || item.product?.id || 'PERFUME-SWISS'),
+      title: `${item.name || item.product?.name || 'Perfume'} (${item.size || item.selectedSize || '100ml'})`,
+      description: item.referenceName || item.product?.referenceName || 'Perfumes Premium Swiss Atelier',
+      quantity: Number(item.quantity || 1),
+      unit_price: Number(item.price || item.selectedPrice || item.product?.price || 0),
       currency_id: 'BRL'
     }));
 
+    // If total provided and items are empty, create generic item
+    if (mpItems.length === 0 && total) {
+      mpItems.push({
+        id: 'PEDIDO-SWISS',
+        title: `Pedido Swiss Atelier #${orderId}`,
+        description: 'Perfumes Premium Importados Swiss',
+        quantity: 1,
+        unit_price: Number(total),
+        currency_id: 'BRL'
+      });
+    }
+
+    const cleanCpf = (payer?.cpf || '').replace(/\D/g, '');
+    const cleanPhone = (payer?.phone || '').replace(/\D/g, '');
+    const origin = req.headers.origin || 'https://premium-swiss.vercel.app';
+
     const preference = new Preference(client);
 
-    const result = await preference.create({
-      body: {
-        items: mpItems,
-        external_reference: orderId,
-        payer: {
-          name: payer?.name || 'Cliente Swiss',
-          email: payer?.email || 'cliente@swiss.com',
-          phone: {
-            number: (payer?.phone || '').replace(/\D/g, '')
-          },
-          identification: {
-            type: 'CPF',
-            number: (payer?.cpf || '').replace(/\D/g, '')
-          }
+    const preferencePayload: any = {
+      items: mpItems,
+      external_reference: orderId,
+      payer: {
+        name: payer?.name?.split(' ')[0] || 'Cliente',
+        surname: payer?.name?.split(' ').slice(1).join(' ') || 'Swiss',
+        email: payer?.email || 'cliente@swiss.com',
+        phone: {
+          area_code: cleanPhone.slice(0, 2) || '11',
+          number: cleanPhone.slice(2) || '999999999'
         },
-        auto_return: 'approved'
-      }
+        address: {
+          zip_code: (payer?.cep || '').replace(/\D/g, ''),
+          street_name: payer?.street || 'Rua',
+          street_number: Number(payer?.number) || 1
+        }
+      },
+      payment_methods: {
+        installments: 12
+      },
+      back_urls: {
+        success: `${origin}/?status=approved&orderId=${orderId}`,
+        pending: `${origin}/?status=pending&orderId=${orderId}`,
+        failure: `${origin}/?status=failure&orderId=${orderId}`
+      },
+      auto_return: 'approved'
+    };
+
+    if (cleanCpf && (cleanCpf.length === 11 || cleanCpf.length === 14)) {
+      preferencePayload.payer.identification = {
+        type: cleanCpf.length === 14 ? 'CNPJ' : 'CPF',
+        number: cleanCpf
+      };
+    }
+
+    if (Number(shippingCost) > 0) {
+      preferencePayload.shipments = {
+        cost: Number(shippingCost),
+        mode: 'not_specified'
+      };
+    }
+
+    const result = await preference.create({
+      body: preferencePayload
     });
 
     res.json({
@@ -720,7 +763,8 @@ app.post('/api/mercadopago/create-preference', async (req, res) => {
     console.error('Erro ao criar preferência no Mercado Pago:', error);
     res.status(500).json({
       error: 'PREFERENCE_CREATION_FAILED',
-      message: error?.message || 'Falha ao criar preferência de checkout.'
+      message: error?.message || 'Falha ao criar preferência de checkout.',
+      details: error
     });
   }
 });
