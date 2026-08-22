@@ -323,7 +323,7 @@ export const PurchasingPolicyModal: React.FC<PurchasingPolicyModalProps> = ({ is
                 <div className="space-y-1 text-xs sm:text-sm">
                   <p className="text-white font-medium">📱 <strong>WhatsApp Atendimento:</strong> (54) 99989-3370</p>
                   <p className="text-white font-medium">📧 <strong>E-mail:</strong> terrestiago@hotmail.com</p>
-                  <p className="text-neutral-400 text-xs">⏰ Horário: Segunda a Sexta, das 9h às 18h (retorno em até 24h úteis)</p>
+                  <p className="text-neutral-400 text-xs">⏰ Horário: Atendimento diário das 7h às 21h</p>
                 </div>
                 <a
                   href="https://wa.me/5554999893370"

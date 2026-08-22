@@ -404,7 +404,7 @@ export default function App() {
                     rel="noopener noreferrer"
                     className="hover:text-white transition-colors flex items-center gap-1 text-emerald-400"
                   >
-                    <span>WhatsApp Executivo 24h</span>
+                    <span>WhatsApp Executivo (7h às 21h)</span>
                   </a>
                 </li>
               </ul>

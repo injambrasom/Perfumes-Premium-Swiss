@@ -108,7 +108,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenSearch, onOpenQuiz, onSele
                   className="hover:text-white transition-colors flex items-center gap-1 text-emerald-400"
                 >
                   <MessageCircle className="w-3.5 h-3.5" />
-                  <span>WhatsApp 24h</span>
+                  <span>WhatsApp Executivo (7h às 21h)</span>
                 </a>
               </li>
             </ul>
