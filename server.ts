@@ -20,9 +20,12 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.text({ type: '*/*', limit: '10mb' }));
 
+// Default Mercado Pago Access Token provided by store owner
+const DEFAULT_MP_ACCESS_TOKEN = 'APP_USR-7347922819217970-010521-4f7235fc4e8db7b024a5da19c892f407-180258706';
+
 // Helper to get Mercado Pago client safely
 function getMercadoPagoClient() {
-  const token = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+  const token = process.env.MERCADO_PAGO_ACCESS_TOKEN || DEFAULT_MP_ACCESS_TOKEN;
   if (!token) {
     return null;
   }
@@ -38,7 +41,8 @@ function getMercadoPagoClient() {
 
 // Health Check Endpoint
 app.get('/api/health', (req, res) => {
-  const hasToken = Boolean(process.env.MERCADO_PAGO_ACCESS_TOKEN);
+  const token = process.env.MERCADO_PAGO_ACCESS_TOKEN || DEFAULT_MP_ACCESS_TOKEN;
+  const hasToken = Boolean(token);
   const hasPublicKey = Boolean(process.env.VITE_MERCADO_PAGO_PUBLIC_KEY);
   res.json({
     status: 'ok',
