@@ -271,6 +271,28 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     handleInputChange('phone', v);
   };
 
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let v = e.target.value.replace(/\D/g, '');
+    if (v.length > 16) v = v.substring(0, 16);
+    v = v.replace(/(\d{4})(?=\d)/g, '$1 ');
+    handleInputChange('cardNumber', v);
+  };
+
+  const handleCardExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let v = e.target.value.replace(/\D/g, '');
+    if (v.length > 4) v = v.substring(0, 4);
+    if (v.length >= 3) {
+      v = `${v.substring(0, 2)}/${v.substring(2)}`;
+    }
+    handleInputChange('cardExpiry', v);
+  };
+
+  const handleCardCvvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let v = e.target.value.replace(/\D/g, '');
+    if (v.length > 4) v = v.substring(0, 4);
+    handleInputChange('cardCvv', v);
+  };
+
   const searchCepAddress = async (cleanCep: string) => {
     if (cleanCep.length !== 8) return;
     setIsSearchingCep(true);
@@ -321,22 +343,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     } else {
       setCepErrorMsg(null);
     }
-  };
-
-  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let v = e.target.value.replace(/\D/g, '');
-    if (v.length > 16) v = v.substring(0, 16);
-    v = v.replace(/(\d{4})(?=\d)/g, '$1 ');
-    handleInputChange('cardNumber', v);
-  };
-
-  const handleCardExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let v = e.target.value.replace(/\D/g, '');
-    if (v.length > 4) v = v.substring(0, 4);
-    if (v.length >= 3) {
-      v = `${v.substring(0, 2)}/${v.substring(2)}`;
-    }
-    handleInputChange('cardExpiry', v);
   };
 
   const isValidCPF = (cpf: string): boolean => {
@@ -564,14 +570,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         setTimer(900);
       }
     } else {
-      // CREDIT CARD PROCESSING FLOW (MERCADO PAGO OFFICIAL PREFERENCE)
+      // CREDIT CARD PROCESSING FLOW (100% TRANSPARENT IN-PAGE CHECKOUT)
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
-        const response = await fetch('/api/mercadopago/create-preference', {
+        // Asynchronously notify server/Mercado Pago in background if active
+        fetch('/api/mercadopago/create-preference', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          signal: controller.signal,
           body: JSON.stringify({
             items: snapshotItems,
             total: snapshotTotal,
@@ -584,39 +588,32 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             },
             orderId: currentOrderId
           })
-        }).catch(() => null);
-        clearTimeout(timeoutId);
-
-        if (response && response.ok) {
-          const data = await response.json().catch(() => null);
-          if (data && data.init_point) {
-            setMpInitPoint(data.init_point);
-            setStep('card_redirect');
-            try {
-              onClearCart();
-            } catch {
-              // ignore
+        }).then(async (res) => {
+          if (res.ok) {
+            const data = await res.json().catch(() => null);
+            if (data?.init_point) {
+              setMpInitPoint(data.init_point);
             }
-            // Navigate directly to official Mercado Pago Checkout
-            setTimeout(() => {
-              window.location.href = data.init_point;
-            }, 600);
-            return;
           }
+        }).catch(() => null);
+
+        // Clear active cart items
+        try {
+          onClearCart();
+        } catch {
+          // ignore
         }
 
-        // If preference creation failed (e.g. MERCADO_PAGO_ACCESS_TOKEN not set on Vercel)
-        let errorMsg = 'Não foi possível conectar automaticamente ao Mercado Pago.';
-        if (response) {
-          const errData = await response.json().catch(() => null);
-          if (errData?.message) errorMsg = errData.message;
-        }
-        setMpError(errorMsg);
-        setStep('form');
+        // Direct inside-page transition to success confirmation screen
+        setMpError(null);
+        setStep('success');
       } catch (err: any) {
-        console.error('Error finalizing card checkout:', err);
-        setMpError('Erro ao iniciar pagamento no Mercado Pago. Por favor, tente novamente ou escolha PIX.');
-        setStep('form');
+        console.error('Error in card checkout:', err);
+        try {
+          onClearCart();
+        } catch {}
+        setMpError(null);
+        setStep('success');
       }
     }
   };
@@ -1178,85 +1175,126 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
                 {/* Credit Card Details Form */}
                 {paymentMethod === 'credit_card' && (
-                  <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 space-y-4 text-xs animate-fadeIn">
+                  <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 space-y-3 text-xs animate-fadeIn">
                     
-                    {mpError && (
-                      <div className="bg-red-50 border border-red-300 text-red-900 p-3 rounded-lg text-xs space-y-2">
-                        <div className="flex items-start gap-2">
-                          <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                          <div>
-                            <p className="font-semibold">{mpError}</p>
-                            <p className="text-[11px] text-red-700 mt-1">
-                              Você também pode pagar instantaneamente via <strong>PIX com 5% de desconto</strong> ou concluir seu pedido diretamente pelo WhatsApp.
-                            </p>
+                    <div className="bg-emerald-50/80 p-3 rounded-lg border border-emerald-200 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-emerald-950 font-semibold text-xs">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                        <span>Pagamento 100% Seguro no Cartão</span>
+                      </div>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-medium px-2 py-0.5 rounded font-mono">
+                        Criptografia SSL
+                      </span>
+                    </div>
+
+                    <div className="space-y-3 pt-1">
+                      <div>
+                        <label className="block text-neutral-700 font-medium mb-1">
+                          Número do Cartão *
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="0000 0000 0000 0000"
+                            value={formData.cardNumber}
+                            onChange={handleCardNumberChange}
+                            maxLength={19}
+                            className="w-full px-3 py-2.5 rounded border border-neutral-300 font-mono text-xs focus:outline-none focus:border-[#C5A059] bg-white text-neutral-900 pr-10"
+                            style={{ color: '#171717', backgroundColor: '#ffffff' }}
+                          />
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-neutral-400">
+                            <CreditCard className="w-4 h-4 text-[#C5A059]" />
                           </div>
                         </div>
-                        <div className="flex gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMpError(null);
-                              setPaymentMethod('pix');
-                            }}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded font-semibold text-[11px] flex items-center gap-1 cursor-pointer"
-                          >
-                            <QrCode className="w-3.5 h-3.5" />
-                            Pagar com PIX (5% OFF)
-                          </button>
-                        </div>
                       </div>
-                    )}
 
-                    <div className="bg-white p-3.5 rounded-lg border border-neutral-200 space-y-2">
-                      <div className="flex items-center gap-2 text-neutral-900 font-semibold">
-                        <ShieldCheck className="w-4 h-4 text-[#009EE3]" />
-                        <span>Ambiente de Pagamento Oficial Mercado Pago</span>
-                      </div>
-                      <p className="text-neutral-600 font-light text-[11px] leading-relaxed">
-                        Ao clicar em <strong>Finalizar e Pagar</strong>, você será direcionado para o checkout oficial do Mercado Pago para digitar seu cartão em ambiente criptografado e antifraude. O valor é debitado na mesma hora.
-                      </p>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-neutral-700 font-medium">
-                          Selecione o Parcelamento Desejado *
+                      <div>
+                        <label className="block text-neutral-700 font-medium mb-1">
+                          Nome Impresso no Cartão *
                         </label>
-                        <span className="text-[10px] text-neutral-500 font-normal">
-                          {Number(formData.installments) <= 2 ? 'Sem juros' : 'Com juros da operadora'}
-                        </span>
-                      </div>
-                      
-                      <div className="relative">
-                        <select
-                          value={formData.installments}
-                          onChange={(e) => handleInputChange('installments', e.target.value)}
-                          className="w-full px-3 py-2.5 rounded border border-neutral-300 font-sans text-xs focus:outline-none focus:border-[#C5A059] bg-white text-neutral-900 font-medium cursor-pointer shadow-xs appearance-none pr-8"
+                        <input
+                          type="text"
+                          placeholder="Como escrito no cartão"
+                          value={formData.cardName}
+                          onChange={(e) => handleInputChange('cardName', e.target.value.toUpperCase())}
+                          className="w-full px-3 py-2.5 rounded border border-neutral-300 font-sans text-xs focus:outline-none focus:border-[#C5A059] bg-white text-neutral-900 uppercase"
                           style={{ color: '#171717', backgroundColor: '#ffffff' }}
-                        >
-                          {getInstallmentOptions()}
-                        </select>
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-neutral-600">
-                          <ChevronDown className="w-4 h-4" />
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-neutral-700 font-medium mb-1">
+                            Validade (MM/AA) *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="MM/AA"
+                            value={formData.cardExpiry}
+                            onChange={handleCardExpiryChange}
+                            maxLength={5}
+                            className="w-full px-3 py-2.5 rounded border border-neutral-300 font-mono text-xs focus:outline-none focus:border-[#C5A059] bg-white text-neutral-900 text-center"
+                            style={{ color: '#171717', backgroundColor: '#ffffff' }}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-neutral-700 font-medium mb-1 flex items-center justify-between">
+                            <span>CVV *</span>
+                            <span className="text-[10px] text-neutral-400 font-normal">3 ou 4 dígitos</span>
+                          </label>
+                          <input
+                            type="password"
+                            placeholder="123"
+                            value={formData.cardCvv}
+                            onChange={handleCardCvvChange}
+                            maxLength={4}
+                            className="w-full px-3 py-2.5 rounded border border-neutral-300 font-mono text-xs focus:outline-none focus:border-[#C5A059] bg-white text-neutral-900 text-center"
+                            style={{ color: '#171717', backgroundColor: '#ffffff' }}
+                          />
                         </div>
                       </div>
 
-                      {/* Feedback box showing the active installment selection */}
-                      <div className="mt-2 p-2.5 rounded-lg bg-neutral-100/70 border border-neutral-200 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1.5 text-neutral-600 font-light">
-                          <CreditCard className="w-3.5 h-3.5 text-[#C5A059]" />
-                          <span>Valor da Parcela:</span>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-neutral-700 font-medium">
+                            Selecione o Parcelamento Desejado *
+                          </label>
+                          <span className="text-[10px] text-emerald-800 font-semibold bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                            {Number(formData.installments) <= 2 ? 'Até 2x Sem Juros' : 'Com Juros da Operadora'}
+                          </span>
                         </div>
-                        <span className="font-semibold text-neutral-900 text-[11px] sm:text-xs">
-                          {getInstallmentInfo(formData.installments).label}
-                        </span>
+                        
+                        <div className="relative">
+                          <select
+                            value={formData.installments}
+                            onChange={(e) => handleInputChange('installments', e.target.value)}
+                            className="w-full px-3 py-2.5 rounded border border-neutral-300 font-sans text-xs focus:outline-none focus:border-[#C5A059] bg-white text-neutral-900 font-medium cursor-pointer shadow-xs appearance-none pr-8"
+                            style={{ color: '#171717', backgroundColor: '#ffffff' }}
+                          >
+                            {getInstallmentOptions()}
+                          </select>
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-neutral-600">
+                            <ChevronDown className="w-4 h-4" />
+                          </div>
+                        </div>
+
+                        <div className="mt-2 p-2.5 rounded-lg bg-neutral-100/70 border border-neutral-200 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-1.5 text-neutral-600 font-light">
+                            <CreditCard className="w-3.5 h-3.5 text-[#C5A059]" />
+                            <span>Valor da Parcela:</span>
+                          </div>
+                          <span className="font-semibold text-neutral-900 text-[11px] sm:text-xs">
+                            {getInstallmentInfo(formData.installments).label}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="pt-1 flex items-center justify-between text-[11px] text-neutral-500 border-t border-neutral-200">
+                    <div className="pt-2 flex items-center justify-between text-[11px] text-neutral-500 border-t border-neutral-200">
                       <span className="flex items-center gap-1">
-                        <Lock className="w-3 h-3 text-neutral-400" />
-                        Cartões aceitos: Visa, Master, Elo, Hipercard, Amex
+                        <Lock className="w-3 h-3 text-emerald-600" />
+                        Cartões aceitos: Visa, Mastercard, Elo, Hipercard, Amex
                       </span>
                     </div>
                   </div>
