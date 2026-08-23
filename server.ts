@@ -556,8 +556,8 @@ app.post('/api/inventory/deduct', (req, res) => {
   });
 });
 
-// 1. Create PIX Payment
-app.post('/api/mercadopago/create-pix', async (req, res) => {
+// 1. Create PIX Payment (supports /api/mercadopago/create-pix and /mercadopago/create-pix)
+const handleCreatePix = async (req: express.Request, res: express.Response) => {
   try {
     const client = getMercadoPagoClient();
     if (!client) {
@@ -640,10 +640,13 @@ app.post('/api/mercadopago/create-pix', async (req, res) => {
       details: error
     });
   }
-});
+};
+
+app.post('/api/mercadopago/create-pix', handleCreatePix);
+app.post('/mercadopago/create-pix', handleCreatePix);
 
 // 2. Check Payment Status
-app.get('/api/mercadopago/payment-status/:id', async (req, res) => {
+const handlePaymentStatus = async (req: express.Request, res: express.Response) => {
   try {
     const client = getMercadoPagoClient();
     if (!client) {
@@ -669,10 +672,13 @@ app.get('/api/mercadopago/payment-status/:id', async (req, res) => {
       message: error?.message || 'Erro ao consultar status.'
     });
   }
-});
+};
+
+app.get('/api/mercadopago/payment-status/:id', handlePaymentStatus);
+app.get('/mercadopago/payment-status/:id', handlePaymentStatus);
 
 // 3. Create Preference (Checkout Pro / Mercado Pago)
-app.post('/api/mercadopago/create-preference', async (req, res) => {
+const handleCreatePreference = async (req: express.Request, res: express.Response) => {
   try {
     const client = getMercadoPagoClient();
     if (!client) {
@@ -790,7 +796,10 @@ app.post('/api/mercadopago/create-preference', async (req, res) => {
       details: error
     });
   }
-});
+};
+
+app.post('/api/mercadopago/create-preference', handleCreatePreference);
+app.post('/mercadopago/create-preference', handleCreatePreference);
 
 // ==========================================
 // VITE / STATIC SERVING SETUP

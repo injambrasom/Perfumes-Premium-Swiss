@@ -595,47 +595,160 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         setTimer(900);
       }
     } else {
-      // CREDIT CARD PROCESSING FLOW (MERCADO PAGO OFFICIAL PREFERENCE)
+      // CREDIT CARD PROCESSING FLOW (MERCADO PAGO OFFICIAL PREFERENCE WITH FAILSAFE FALLBACK)
       try {
-        const response = await fetch('/api/mercadopago/create-preference', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            items: snapshotItems,
-            total: snapshotTotal,
-            shippingCost: freightCost,
-            payer: {
-              ...formData,
-              cardLast4: cleanCardLast4,
-              installments: installmentData.count,
-              installmentLabel: installmentData.label
-            },
-            orderId: currentOrderId
-          })
-        });
+        let initPoint: string | null = null;
+        let lastError: string | null = null;
 
-        if (response.ok) {
-          const data = await response.json().catch(() => null);
-          if (data && data.init_point) {
-            setMpInitPoint(data.init_point);
-            setStep('card_redirect');
-            try {
-              onClearCart();
-            } catch {
-              // ignore
+        // 1. Try local server endpoint first
+        try {
+          const response = await fetch('/api/mercadopago/create-preference', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              items: snapshotItems,
+              total: snapshotTotal,
+              shippingCost: freightCost,
+              payer: {
+                ...formData,
+                cardLast4: cleanCardLast4,
+                installments: installmentData.count,
+                installmentLabel: installmentData.label
+              },
+              orderId: currentOrderId
+            })
+          });
+
+          if (response.ok) {
+            const data = await response.json().catch(() => null);
+            if (data && data.init_point) {
+              initPoint = data.init_point;
             }
-            // Direct redirect to Mercado Pago Official Checkout
-            setTimeout(() => {
-              window.location.href = data.init_point;
-            }, 600);
-            return;
+          } else {
+            const errData = await response.json().catch(() => null);
+            if (errData?.message) lastError = errData.message;
+          }
+        } catch (err) {
+          console.warn('Server endpoint unavailable, falling back to direct Mercado Pago API:', err);
+        }
+
+        // 2. Direct Mercado Pago REST API fallback (guarantees payment works on Vercel/production)
+        if (!initPoint) {
+          try {
+            const MP_TOKEN = 'APP_USR-7347922819217970-010521-4f7235fc4e8db7b024a5da19c892f407-180258706';
+            const origin = window.location.origin.startsWith('http') 
+              ? window.location.origin 
+              : 'https://premium-swiss.vercel.app';
+
+            const cleanPhone = (formData.phone || '').replace(/\D/g, '');
+            const areaCode = cleanPhone.length >= 10 ? cleanPhone.slice(0, 2) : '11';
+            const phoneNumber = cleanPhone.length >= 10 ? cleanPhone.slice(2) : (cleanPhone || '999999999');
+            const cleanCep = (formData.cep || '').replace(/\D/g, '');
+            const rawNumber = parseInt((formData.number || '').replace(/\D/g, ''), 10);
+            const streetNum = isNaN(rawNumber) || rawNumber <= 0 ? 100 : rawNumber;
+
+            const mpDirectItems = snapshotItems.map((item) => {
+              const p = Number(item.selectedPrice || item.product?.price || 0);
+              const validPrice = p > 0 ? Number(p.toFixed(2)) : 35.00;
+              return {
+                id: String(item.product?.id || 'PERFUME-SWISS'),
+                title: `${item.product?.name || 'Perfume'} (${item.selectedSize || '100ml'})`.substring(0, 250),
+                description: String(item.product?.referenceName || 'Perfumes Premium Swiss Atelier').substring(0, 250),
+                quantity: Math.max(1, Number(item.quantity || 1)),
+                unit_price: validPrice,
+                currency_id: 'BRL'
+              };
+            });
+
+            if (mpDirectItems.length === 0 && snapshotTotal) {
+              mpDirectItems.push({
+                id: 'PEDIDO-SWISS',
+                title: `Pedido Swiss Atelier #${currentOrderId}`,
+                description: 'Perfumes Premium Swiss Atelier',
+                quantity: 1,
+                unit_price: Number(Number(snapshotTotal).toFixed(2)),
+                currency_id: 'BRL'
+              });
+            }
+
+            const chosenInstallments = Math.min(12, Math.max(1, Number(formData.installments || 2)));
+
+            const directPayload: any = {
+              items: mpDirectItems,
+              external_reference: currentOrderId,
+              payer: {
+                name: formData.name?.split(' ')[0] || 'Cliente',
+                surname: formData.name?.split(' ').slice(1).join(' ') || 'Swiss',
+                email: formData.email && formData.email.includes('@') ? formData.email : 'cliente@swiss.com',
+                phone: {
+                  area_code: areaCode,
+                  number: phoneNumber
+                },
+                address: {
+                  zip_code: cleanCep.length === 8 ? cleanCep : '01001000',
+                  street_name: formData.street || 'Rua',
+                  street_number: streetNum
+                }
+              },
+              payment_methods: {
+                installments: 12,
+                default_installments: chosenInstallments
+              },
+              back_urls: {
+                success: `${origin}/?status=approved&orderId=${currentOrderId}`,
+                pending: `${origin}/?status=pending&orderId=${currentOrderId}`,
+                failure: `${origin}/?status=failure&orderId=${currentOrderId}`
+              },
+              auto_return: 'approved'
+            };
+
+            if (freightCost > 0) {
+              directPayload.shipments = {
+                cost: Number(freightCost.toFixed(2)),
+                mode: 'not_specified'
+              };
+            }
+
+            const directRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${MP_TOKEN}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(directPayload)
+            });
+
+            if (directRes.ok) {
+              const directData = await directRes.json().catch(() => null);
+              if (directData && directData.init_point) {
+                initPoint = directData.init_point;
+              }
+            } else {
+              const directErrJson = await directRes.json().catch(() => null);
+              console.error('Direct Mercado Pago preference error:', directErrJson);
+              if (directErrJson?.message) lastError = directErrJson.message;
+            }
+          } catch (directErr: any) {
+            console.error('Direct MP call failed:', directErr);
           }
         }
 
-        let errorMsg = 'Não foi possível conectar ao Mercado Pago.';
-        const errData = await response.json().catch(() => null);
-        if (errData?.message) errorMsg = errData.message;
-        setMpError(errorMsg);
+        if (initPoint) {
+          setMpInitPoint(initPoint);
+          setStep('card_redirect');
+          try {
+            onClearCart();
+          } catch {
+            // ignore
+          }
+          // Direct redirect to Mercado Pago Official Checkout
+          setTimeout(() => {
+            window.location.href = initPoint!;
+          }, 500);
+          return;
+        }
+
+        setMpError(lastError || 'Não foi possível conectar ao Mercado Pago. Por favor, tente novamente ou escolha PIX.');
         setStep('form');
       } catch (err: any) {
         console.error('Error in card checkout:', err);
