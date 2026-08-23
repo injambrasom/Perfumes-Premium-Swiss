@@ -1204,6 +1204,33 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 {paymentMethod === 'credit_card' && (
                   <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 space-y-3 text-xs animate-fadeIn">
                     
+                    {mpError && (
+                      <div className="bg-red-50 border border-red-300 text-red-900 p-3 rounded-lg text-xs space-y-2">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-semibold">{mpError}</p>
+                            <p className="text-[11px] text-red-700 mt-1">
+                              Você também pode pagar instantaneamente via <strong>PIX com 5% de desconto</strong> ou concluir seu pedido diretamente pelo WhatsApp.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMpError(null);
+                              setPaymentMethod('pix');
+                            }}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded font-semibold text-[11px] flex items-center gap-1 cursor-pointer"
+                          >
+                            <QrCode className="w-3.5 h-3.5" />
+                            Pagar com PIX (5% OFF)
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="bg-emerald-50/80 p-3 rounded-lg border border-emerald-200 flex items-center justify-between">
                       <div className="flex items-center gap-2 text-emerald-950 font-semibold text-xs">
                         <ShieldCheck className="w-4 h-4 text-emerald-600" />

@@ -684,52 +684,67 @@ app.post('/api/mercadopago/create-preference', async (req, res) => {
 
     const { items, payer, orderId, shippingCost, total } = req.body;
 
-    const mpItems = (items || []).map((item: any) => ({
-      id: String(item.productId || item.product?.id || 'PERFUME-SWISS'),
-      title: `${item.name || item.product?.name || 'Perfume'} (${item.size || item.selectedSize || '100ml'})`,
-      description: item.referenceName || item.product?.referenceName || 'Perfumes Premium Swiss Atelier',
-      quantity: Number(item.quantity || 1),
-      unit_price: Number(item.price || item.selectedPrice || item.product?.price || 0),
-      currency_id: 'BRL'
-    }));
+    const mpItems = (items || []).map((item: any) => {
+      const rawPrice = Number(item.price || item.selectedPrice || item.product?.price || 0);
+      const validPrice = rawPrice > 0 ? Number(rawPrice.toFixed(2)) : 35.00;
+      return {
+        id: String(item.productId || item.product?.id || 'PERFUME-SWISS'),
+        title: `${item.name || item.product?.name || 'Perfume'} (${item.size || item.selectedSize || '100ml'})`.substring(0, 250),
+        description: String(item.referenceName || item.product?.referenceName || 'Perfumes Premium Swiss Atelier').substring(0, 250),
+        quantity: Math.max(1, Number(item.quantity || 1)),
+        unit_price: validPrice,
+        currency_id: 'BRL'
+      };
+    });
 
     // If total provided and items are empty, create generic item
     if (mpItems.length === 0 && total) {
+      const calcTotal = Number(total) > 0 ? Number(Number(total).toFixed(2)) : 35.00;
       mpItems.push({
         id: 'PEDIDO-SWISS',
         title: `Pedido Swiss Atelier #${orderId}`,
         description: 'Perfumes Premium Importados Swiss',
         quantity: 1,
-        unit_price: Number(total),
+        unit_price: calcTotal,
         currency_id: 'BRL'
       });
     }
 
     const cleanCpf = (payer?.cpf || '').replace(/\D/g, '');
     const cleanPhone = (payer?.phone || '').replace(/\D/g, '');
+    const areaCode = cleanPhone.length >= 10 ? cleanPhone.slice(0, 2) : '11';
+    const phoneNumber = cleanPhone.length >= 10 ? cleanPhone.slice(2) : (cleanPhone.length > 0 ? cleanPhone : '999999999');
+    
+    const rawNumber = parseInt((payer?.number || '').replace(/\D/g, ''), 10);
+    const streetNum = isNaN(rawNumber) || rawNumber <= 0 ? 100 : rawNumber;
+    const cleanCep = (payer?.cep || '').replace(/\D/g, '');
+
     const origin = req.headers.origin || 'https://premium-swiss.vercel.app';
 
     const preference = new Preference(client);
 
+    const chosenInstallments = Math.min(12, Math.max(1, Number(payer?.installments || 2)));
+
     const preferencePayload: any = {
       items: mpItems,
-      external_reference: orderId,
+      external_reference: String(orderId || `SWISS-${Date.now()}`),
       payer: {
         name: payer?.name?.split(' ')[0] || 'Cliente',
         surname: payer?.name?.split(' ').slice(1).join(' ') || 'Swiss',
-        email: payer?.email || 'cliente@swiss.com',
+        email: payer?.email && payer.email.includes('@') ? payer.email : 'cliente@swiss.com',
         phone: {
-          area_code: cleanPhone.slice(0, 2) || '11',
-          number: cleanPhone.slice(2) || '999999999'
+          area_code: areaCode,
+          number: phoneNumber
         },
         address: {
-          zip_code: (payer?.cep || '').replace(/\D/g, ''),
+          zip_code: cleanCep.length === 8 ? cleanCep : '01001000',
           street_name: payer?.street || 'Rua',
-          street_number: Number(payer?.number) || 1
+          street_number: streetNum
         }
       },
       payment_methods: {
-        installments: 12
+        installments: 12,
+        default_installments: chosenInstallments
       },
       back_urls: {
         success: `${origin}/?status=approved&orderId=${orderId}`,
@@ -753,9 +768,13 @@ app.post('/api/mercadopago/create-preference', async (req, res) => {
       };
     }
 
+    console.log('Creating Mercado Pago preference with payload:', JSON.stringify(preferencePayload));
+
     const result = await preference.create({
       body: preferencePayload
     });
+
+    console.log('Mercado Pago preference created successfully:', result.id, result.init_point);
 
     res.json({
       success: true,
@@ -764,7 +783,7 @@ app.post('/api/mercadopago/create-preference', async (req, res) => {
       sandbox_init_point: result.sandbox_init_point
     });
   } catch (error: any) {
-    console.error('Erro ao criar preferência no Mercado Pago:', error);
+    console.error('Erro ao criar preferência no Mercado Pago:', error?.message || error, error);
     res.status(500).json({
       error: 'PREFERENCE_CREATION_FAILED',
       message: error?.message || 'Falha ao criar preferência de checkout.',
