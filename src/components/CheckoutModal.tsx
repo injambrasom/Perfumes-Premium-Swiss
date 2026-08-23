@@ -213,6 +213,31 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return () => clearInterval(interval);
   }, [step, pixPaymentId, onClearCart]);
 
+  // Check for return from Mercado Pago checkout with status=approved or pending
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const status = params.get('status') || params.get('collection_status');
+      const returnOrderId = params.get('orderId') || params.get('external_reference');
+
+      if (status === 'approved' || status === 'pending') {
+        if (returnOrderId) {
+          setOrderId(returnOrderId);
+        }
+        setStep('success');
+        try {
+          onClearCart();
+        } catch {
+          // ignore
+        }
+        // Clean URL parameters cleanly without page refresh
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    } catch {
+      // ignore
+    }
+  }, [onClearCart]);
+
   // Safety watchdog: ensure 'processing' never gets stuck indefinitely
   useEffect(() => {
     let watchdog: NodeJS.Timeout;
@@ -570,10 +595,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         setTimer(900);
       }
     } else {
-      // CREDIT CARD PROCESSING FLOW (100% TRANSPARENT IN-PAGE CHECKOUT)
+      // CREDIT CARD PROCESSING FLOW (MERCADO PAGO OFFICIAL PREFERENCE)
       try {
-        // Asynchronously notify server/Mercado Pago in background if active
-        fetch('/api/mercadopago/create-preference', {
+        const response = await fetch('/api/mercadopago/create-preference', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -588,32 +612,35 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             },
             orderId: currentOrderId
           })
-        }).then(async (res) => {
-          if (res.ok) {
-            const data = await res.json().catch(() => null);
-            if (data?.init_point) {
-              setMpInitPoint(data.init_point);
-            }
-          }
-        }).catch(() => null);
+        });
 
-        // Clear active cart items
-        try {
-          onClearCart();
-        } catch {
-          // ignore
+        if (response.ok) {
+          const data = await response.json().catch(() => null);
+          if (data && data.init_point) {
+            setMpInitPoint(data.init_point);
+            setStep('card_redirect');
+            try {
+              onClearCart();
+            } catch {
+              // ignore
+            }
+            // Direct redirect to Mercado Pago Official Checkout
+            setTimeout(() => {
+              window.location.href = data.init_point;
+            }, 600);
+            return;
+          }
         }
 
-        // Direct inside-page transition to success confirmation screen
-        setMpError(null);
-        setStep('success');
+        let errorMsg = 'Não foi possível conectar ao Mercado Pago.';
+        const errData = await response.json().catch(() => null);
+        if (errData?.message) errorMsg = errData.message;
+        setMpError(errorMsg);
+        setStep('form');
       } catch (err: any) {
         console.error('Error in card checkout:', err);
-        try {
-          onClearCart();
-        } catch {}
-        setMpError(null);
-        setStep('success');
+        setMpError('Erro ao conectar com Mercado Pago. Por favor, tente novamente ou escolha PIX.');
+        setStep('form');
       }
     }
   };

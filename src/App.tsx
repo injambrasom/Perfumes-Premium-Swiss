@@ -94,6 +94,17 @@ export default function App() {
     // Backup polling every 30s instead of 3s to avoid overwriting real-time Firebase data
     const interval = setInterval(fetchLiveInventory, 30000);
 
+    // Auto-open Checkout Modal if returning from Mercado Pago with status=approved or pending
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const status = params.get('status') || params.get('collection_status');
+      if (status === 'approved' || status === 'pending') {
+        setIsCheckoutOpen(true);
+      }
+    } catch {
+      // ignore
+    }
+
     return () => {
       unsubscribeFirebase();
       clearInterval(interval);
