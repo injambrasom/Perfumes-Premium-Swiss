@@ -187,20 +187,13 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
           </div>
 
           {/* Desktop Hover Quick Action */}
-          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hidden sm:flex items-center justify-center gap-2 p-3 z-20 backdrop-blur-[2px]">
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hidden sm:flex items-center justify-center p-3 z-20 backdrop-blur-[2px]">
             <button
               onClick={() => onQuickView(product)}
-              className="px-3 py-2 bg-white text-neutral-950 hover:bg-[#C5A059] hover:text-white transition-all text-xs font-semibold tracking-wider uppercase flex items-center gap-1.5 cursor-pointer shadow-md"
+              className="px-4 py-2.5 bg-white text-neutral-950 hover:bg-[#C5A059] hover:text-white transition-all text-xs font-semibold tracking-wider uppercase flex items-center gap-2 cursor-pointer shadow-lg"
             >
-              <Eye className="w-3.5 h-3.5" />
+              <Eye className="w-4 h-4" />
               <span>Ver Detalhes</span>
-            </button>
-            <button
-              onClick={() => onAddToCart(product)}
-              className="px-3 py-2 bg-[#C5A059] text-black hover:bg-white transition-all text-xs font-semibold tracking-wider uppercase flex items-center gap-1.5 cursor-pointer shadow-md"
-            >
-              <ShoppingBag className="w-3.5 h-3.5 text-black" />
-              <span>Escolher</span>
             </button>
           </div>
         </div>
