@@ -333,7 +333,7 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
             Fragrâncias Desejadas
           </h2>
           <p className={`mt-3 sm:mt-5 text-sm sm:text-base md:text-lg lg:text-xl font-normal max-w-3xl mx-auto leading-relaxed ${isDarkMode ? 'text-neutral-200' : 'text-neutral-800'}`}>
-            Extrait de Parfum com 36% de essência pura. Frascos de 15ml (R$ 35,00), 55ml (R$ 80,00) e 100ml (R$ 130,00).
+            Extrait de Parfum com 36% de essência. Frascos de 15ml (R$ 35,00), 55ml (R$ 80,00) e 100ml (R$ 130,00).
           </p>
           <div className="w-20 h-[2px] bg-[#C5A059] mx-auto mt-6 shadow-[0_0_10px_#C5A059]" />
         </div>

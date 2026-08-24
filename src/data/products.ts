@@ -24,7 +24,7 @@ const RAW_PRODUCTS: FragranceProduct[] = [
     rating: 5.0,
     reviewsCount: 189,
     image: 'https://i.postimg.cc/r8QSHy1d/Aliem-Swiss-(2).png',
-    description: 'Uma fragrância mística, sensual e iluminada com 36% de essência pura Firmenich. Jasmin Sambac exuberante enriquecido por madeira de cashmeran e âmbar branco.',
+    description: 'Uma fragrância mística, sensual e iluminada com 36% de essência Firmenich. Jasmin Sambac exuberante enriquecido por madeira de cashmeran e âmbar branco.',
     badges: ['Lançamento exclusivo', 'Sucesso Feminino'],
     inStock: true,
     featuredInSignature: true
@@ -51,7 +51,7 @@ const RAW_PRODUCTS: FragranceProduct[] = [
     rating: 4.8,
     reviewsCount: 410,
     image: 'https://i.postimg.cc/4Xnrmjmf/SALVAGE.png',
-    description: 'Frescor e rusticidade nobre com 36% de essência pura Firmenich. A intensidade mineral do ambroxan combinada com pimenta.',
+    description: 'Frescor e rusticidade nobre com 36% de essência Firmenich. A intensidade mineral do ambroxan combinada com pimenta.',
     badges: ['Campeão de Elogios', 'Foto Real'],
     inStock: true,
     featuredInSignature: true
@@ -997,7 +997,7 @@ const RAW_PRODUCTS: FragranceProduct[] = [
     rating: 4.9,
     reviewsCount: 480,
     image: 'https://i.postimg.cc/zD5svBRp/AQUA-DE-DIO.png',
-    description: "O maior \u00edcone aqu\u00e1tico do mundo refinado com a pot\u00eancia de 36% de ess\u00eancia pura.",
+    description: "O maior \u00edcone aqu\u00e1tico do mundo refinado com a pot\u00eancia de 36% de ess\u00eancia.",
     badges: ["Cl\u00e1ssico C\u00edtrico", "Foto Real"],
     inStock: true,
     featuredInSignature: false

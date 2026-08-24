@@ -426,7 +426,7 @@ export default function App() {
                 Garantia &amp; Qualidade
               </h4>
               <p className="text-xs text-neutral-400 font-light leading-relaxed">
-                Extrait de Parfum com 36% de essência pura em todos os tamanhos (15ml, 55ml e 100ml). Fixação comprovada de 8h a 12h+ na pele.
+                Extrait de Parfum com 36% de essência em todos os tamanhos (15ml, 55ml e 100ml). Fixação comprovada de 8h a 12h+ na pele.
               </p>
             </div>
           </div>
@@ -449,7 +449,7 @@ export default function App() {
                 SWISS ATELIER • ESSÊNCIAS PREMIUM
               </span>
               <p className="text-xs text-neutral-400 font-light mt-2 max-w-md">
-                Qualidade e pureza olfativa com 36% de essência pura (Extrait de Parfum) importada.
+                Qualidade e pureza olfativa com 36% de essência (Extrait de Parfum) importada.
               </p>
             </div>
           </div>
