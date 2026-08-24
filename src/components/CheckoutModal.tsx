@@ -756,108 +756,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           }
         }
 
-        if (!cardSuccess) {
-          let initPoint: string | null = null;
-          // Try server preference endpoint first
-          try {
-            const prefRes = await fetch('/api/mercadopago/create-preference', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                items: snapshotItems,
-                total: snapshotTotal,
-                shippingCost: freightCost,
-                payer: formData,
-                orderId: currentOrderId
-              })
-            });
-            if (prefRes.ok) {
-              const prefData = await prefRes.json().catch(() => null);
-              if (prefData?.init_point) {
-                initPoint = prefData.init_point;
-              }
-            }
-          } catch (prefErr) {
-            console.warn('Server preference creation failed, trying direct REST API:', prefErr);
-          }
-
-          // Direct Mercado Pago REST API fallback for init_point
-          if (!initPoint) {
-            try {
-              const MP_TOKEN = 'APP_USR-7347922819217970-010521-4f7235fc4e8db7b024a5da19c892f407-180258706';
-              const origin = window.location.origin.startsWith('http') 
-                ? window.location.origin 
-                : 'https://premium-swiss.vercel.app';
-
-              const mpDirectItems = snapshotItems.map((item) => {
-                const p = Number(item.selectedPrice || item.product?.price || 0);
-                const validPrice = p > 0 ? Number(p.toFixed(2)) : 35.00;
-                return {
-                  id: String(item.product?.id || 'PERFUME-SWISS'),
-                  title: `${item.product?.name || 'Perfume'} (${item.selectedSize || '100ml'})`.substring(0, 250),
-                  quantity: Math.max(1, Number(item.quantity || 1)),
-                  unit_price: validPrice,
-                  currency_id: 'BRL'
-                };
-              });
-
-              if (mpDirectItems.length === 0 && snapshotTotal) {
-                mpDirectItems.push({
-                  id: 'PEDIDO-SWISS',
-                  title: `Pedido Swiss Atelier #${currentOrderId}`,
-                  quantity: 1,
-                  unit_price: Number(Number(snapshotTotal).toFixed(2)),
-                  currency_id: 'BRL'
-                });
-              }
-
-              const directPrefRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${MP_TOKEN}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  items: mpDirectItems,
-                  external_reference: currentOrderId,
-                  payer: {
-                    name: formData.name?.split(' ')[0] || 'Cliente',
-                    surname: formData.name?.split(' ').slice(1).join(' ') || 'Swiss',
-                    email: formData.email && formData.email.includes('@') ? formData.email : 'cliente@swiss.com'
-                  },
-                  back_urls: {
-                    success: `${origin}/?status=approved&orderId=${currentOrderId}`,
-                    pending: `${origin}/?status=pending&orderId=${currentOrderId}`,
-                    failure: `${origin}/?status=failure&orderId=${currentOrderId}`
-                  },
-                  auto_return: 'approved'
-                })
-              });
-
-              if (directPrefRes.ok) {
-                const directData = await directPrefRes.json().catch(() => null);
-                if (directData?.init_point) {
-                  initPoint = directData.init_point;
-                }
-              }
-            } catch (directPrefErr) {
-              console.error('Direct MP preference REST call failed:', directPrefErr);
-            }
-          }
-
-          if (initPoint) {
-            setMpInitPoint(initPoint);
-            try {
-              onClearCart();
-            } catch {
-              // ignore
-            }
-            // Automatically redirect to Mercado Pago Official Checkout page for guaranteed authorization
-            window.location.href = initPoint;
-            return;
-          }
-        }
-
         if (cardSuccess) {
           try {
             onClearCart();
@@ -868,11 +766,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           return;
         }
 
-        setMpError(cardErrorMessage || 'Seu banco ou o Mercado Pago exigem autorização via aplicativo. Clique abaixo para abrir o Checkout Seguro Mercado Pago ou pague via PIX.');
+        setMpError(cardErrorMessage || 'Não foi possível autorizar o cartão no momento. Verifique os dados digitados ou pague via PIX com 5% de desconto.');
         setStep('form');
       } catch (err: any) {
         console.error('Error in direct card checkout:', err);
-        setMpError('Erro ao processar cartão. Escolha a opção PIX com 5% de desconto ou finalize via WhatsApp.');
+        setMpError('Erro ao processar cartão. Por favor, verifique os dados ou pague via PIX.');
         setStep('form');
       }
     }
