@@ -1397,7 +1397,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                           )}
 
                           <a
-                            href={`https://wa.me/5511999999999?text=${encodeURIComponent(`Olá! Tentei realizar a compra do Pedido #${currentOrderId} de R$ ${total.toFixed(2)} no cartão e gostaria de ajuda para finalizar.`)}`}
+                            href={`https://wa.me/5511999999999?text=${encodeURIComponent(`Olá! Tentei realizar a compra do Pedido #${submittedOrderInfo?.orderId || orderId} de R$ ${total.toFixed(2)} no cartão e gostaria de ajuda para finalizar.`)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="bg-neutral-800 hover:bg-neutral-900 text-white px-3 py-2 rounded-lg font-medium text-[11px] flex items-center gap-1.5 cursor-pointer transition-all"
