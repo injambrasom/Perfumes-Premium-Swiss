@@ -756,6 +756,31 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           }
         }
 
+        if (!cardSuccess) {
+          // Generate fallback preference init_point so user can open Mercado Pago Checkout Pro if needed
+          try {
+            const prefRes = await fetch('/api/mercadopago/create-preference', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                items: snapshotItems,
+                total: snapshotTotal,
+                shippingCost: freightCost,
+                payer: formData,
+                orderId: currentOrderId
+              })
+            });
+            if (prefRes.ok) {
+              const prefData = await prefRes.json().catch(() => null);
+              if (prefData?.init_point) {
+                setMpInitPoint(prefData.init_point);
+              }
+            }
+          } catch (prefErr) {
+            console.warn('Fallback preference generation failed:', prefErr);
+          }
+        }
+
         if (cardSuccess) {
           try {
             onClearCart();
@@ -766,11 +791,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           return;
         }
 
-        setMpError(cardErrorMessage || 'Não foi possível autorizar a cobrança no cartão. Verifique os dados ou pague via PIX com 5% OFF.');
+        setMpError(cardErrorMessage || 'O Mercado Pago recusou a transação no cartão por segurança ou dados inconsistentes. Tente pagar via PIX com 5% OFF ou pelo Checkout Oficial.');
         setStep('form');
       } catch (err: any) {
         console.error('Error in direct card checkout:', err);
-        setMpError('Erro ao processar cartão. Por favor, escolha a opção PIX com 5% de desconto.');
+        setMpError('Erro ao processar cartão. Escolha a opção PIX com 5% de desconto ou finalize via WhatsApp.');
         setStep('form');
       }
     }
@@ -1336,28 +1361,50 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 space-y-3 text-xs animate-fadeIn">
                     
                     {mpError && (
-                      <div className="bg-red-50 border border-red-300 text-red-900 p-3 rounded-lg text-xs space-y-2">
-                        <div className="flex items-start gap-2">
-                          <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                      <div className="bg-red-50 border border-red-300 text-red-900 p-3.5 rounded-xl text-xs space-y-2.5 shadow-sm">
+                        <div className="flex items-start gap-2.5">
+                          <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
                           <div>
-                            <p className="font-semibold">{mpError}</p>
-                            <p className="text-[11px] text-red-700 mt-1">
-                              Você também pode pagar instantaneamente via <strong>PIX com 5% de desconto</strong> ou concluir seu pedido diretamente pelo WhatsApp.
+                            <p className="font-semibold text-red-900 text-xs leading-snug">{mpError}</p>
+                            <p className="text-[11px] text-red-700 mt-1 leading-relaxed">
+                              Se a recusa for por política de segurança do banco (trava anti-fraude) ou autofaturamento de teste, você pode concluir seu pedido instantaneamente usando uma das opções abaixo:
                             </p>
                           </div>
                         </div>
-                        <div className="flex gap-2 pt-1">
+                        <div className="flex flex-wrap gap-2 pt-1 border-t border-red-200/80">
                           <button
                             type="button"
                             onClick={() => {
                               setMpError(null);
                               setPaymentMethod('pix');
                             }}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded font-semibold text-[11px] flex items-center gap-1 cursor-pointer"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg font-bold text-[11px] flex items-center gap-1.5 shadow-sm cursor-pointer transition-all"
                           >
                             <QrCode className="w-3.5 h-3.5" />
                             Pagar com PIX (5% OFF)
                           </button>
+
+                          {mpInitPoint && (
+                            <a
+                              href={mpInitPoint}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-bold text-[11px] flex items-center gap-1.5 shadow-sm cursor-pointer transition-all"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              Checkout Seguro Mercado Pago
+                            </a>
+                          )}
+
+                          <a
+                            href={`https://wa.me/5511999999999?text=${encodeURIComponent(`Olá! Tentei realizar a compra do Pedido #${currentOrderId} de R$ ${total.toFixed(2)} no cartão e gostaria de ajuda para finalizar.`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-neutral-800 hover:bg-neutral-900 text-white px-3 py-2 rounded-lg font-medium text-[11px] flex items-center gap-1.5 cursor-pointer transition-all"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                            Ajuda no WhatsApp
+                          </a>
                         </div>
                       </div>
                     )}
