@@ -829,13 +829,33 @@ const handleProcessCard = async (req: express.Request, res: express.Response) =>
     let expYear = parseInt(String(card.expiration_year), 10);
     if (expYear < 100) expYear += 2000;
 
-    // Detect card brand
+    // Detect card brand and issuer accurately via Mercado Pago BIN search API
     let paymentMethodId = 'master';
-    if (/^4/.test(cleanCard)) paymentMethodId = 'visa';
-    else if (/^(5[1-5]|222[1-9]|22[3-9]|2[3-6]|27[0-1]|2720)/.test(cleanCard)) paymentMethodId = 'master';
-    else if (/^(34|37)/.test(cleanCard)) paymentMethodId = 'amex';
-    else if (/^(4011|438935|451416|4576|504175|5067|5090|627780|636297|636368)/.test(cleanCard)) paymentMethodId = 'elo';
-    else if (/^(38|60)/.test(cleanCard)) paymentMethodId = 'hipercard';
+    let issuerId: string | undefined = undefined;
+
+    const bin = cleanCard.slice(0, 6);
+    try {
+      const binRes = await fetch(`https://api.mercadopago.com/v1/payment_methods/search?public_key=${DEFAULT_MP_PUBLIC_KEY}&bin=${bin}`);
+      const binData = await binRes.json().catch(() => null);
+      if (binData && binData.results && binData.results.length > 0) {
+        const pm = binData.results[0];
+        if (pm.id) paymentMethodId = pm.id;
+        if (pm.issuer?.id) issuerId = String(pm.issuer.id);
+      } else {
+        // Regex fallback
+        if (/^4/.test(cleanCard)) paymentMethodId = 'visa';
+        else if (/^(5[1-5]|222[1-9]|22[3-9]|2[3-6]|27[0-1]|2720)/.test(cleanCard)) paymentMethodId = 'master';
+        else if (/^(34|37)/.test(cleanCard)) paymentMethodId = 'amex';
+        else if (/^(4011|438935|451416|4576|504175|5067|5090|627780|636297|636368|6504|6505|6509|6516|6550|2818|509)/.test(cleanCard)) paymentMethodId = 'elo';
+        else if (/^(38|60)/.test(cleanCard)) paymentMethodId = 'hipercard';
+      }
+    } catch {
+      if (/^4/.test(cleanCard)) paymentMethodId = 'visa';
+      else if (/^(5[1-5]|222[1-9]|22[3-9]|2[3-6]|27[0-1]|2720)/.test(cleanCard)) paymentMethodId = 'master';
+      else if (/^(34|37)/.test(cleanCard)) paymentMethodId = 'amex';
+      else if (/^(4011|438935|451416|4576|504175|5067|5090|627780|636297|636368)/.test(cleanCard)) paymentMethodId = 'elo';
+      else if (/^(38|60)/.test(cleanCard)) paymentMethodId = 'hipercard';
+    }
 
     // Step 1: Create Card Token via Mercado Pago REST API
     const tokenRes = await fetch(`https://api.mercadopago.com/v1/card_tokens?access_token=${token}`, {
@@ -879,6 +899,7 @@ const handleProcessCard = async (req: express.Request, res: express.Response) =>
     const cleanPhone = (payer?.phone || '').replace(/\D/g, '');
     const areaCode = cleanPhone.length >= 10 ? cleanPhone.slice(0, 2) : '11';
     const phoneNumber = cleanPhone.length >= 10 ? cleanPhone.slice(2) : (cleanPhone || '999999999');
+    const cleanCep = (payer?.cep || '').replace(/\D/g, '');
 
     const paymentPayload: any = {
       transaction_amount: Number(Number(transaction_amount).toFixed(2)),
@@ -899,13 +920,58 @@ const handleProcessCard = async (req: express.Request, res: express.Response) =>
         phone: {
           area_code: areaCode,
           number: phoneNumber
+        },
+        address: {
+          zip_code: cleanCep.length === 8 ? cleanCep : '01001000',
+          street_name: payer?.street || 'Rua',
+          street_number: String(payer?.number || '123')
+        }
+      },
+      additional_info: {
+        items: [
+          {
+            id: String(orderId || 'swiss-1'),
+            title: description || 'Perfumes Premium Swiss - Pedido',
+            quantity: 1,
+            unit_price: Number(Number(transaction_amount).toFixed(2))
+          }
+        ],
+        payer: {
+          first_name: payer?.name?.split(' ')[0] || 'Cliente',
+          last_name: payer?.name?.split(' ').slice(1).join(' ') || 'Swiss',
+          phone: {
+            area_code: areaCode,
+            number: phoneNumber
+          },
+          address: {
+            zip_code: cleanCep.length === 8 ? cleanCep : '01001000',
+            street_name: payer?.street || 'Rua',
+            street_number: String(payer?.number || '123')
+          }
+        },
+        shipments: {
+          receiver_address: {
+            zip_code: cleanCep.length === 8 ? cleanCep : '01001000',
+            street_name: payer?.street || 'Rua',
+            street_number: String(payer?.number || '123'),
+            floor: payer?.complement || ''
+          }
         }
       }
     };
 
-    console.log('Processing Direct Credit Card Payment:', paymentPayload.payment_method_id, paymentPayload.installments, paymentPayload.transaction_amount);
+    if (issuerId) {
+      paymentPayload.issuer_id = issuerId;
+    }
 
-    const paymentResult = await payment.create({ body: paymentPayload });
+    console.log('Processing Direct Credit Card Payment:', paymentPayload.payment_method_id, paymentPayload.installments, paymentPayload.transaction_amount, 'issuer:', issuerId);
+
+    const paymentResult = await payment.create({
+      body: paymentPayload,
+      requestOptions: {
+        idempotencyKey: `pay-${orderId || Date.now()}-${Date.now()}`
+      }
+    });
 
     console.log('Mercado Pago Card Payment Result:', paymentResult.id, paymentResult.status, paymentResult.status_detail);
 

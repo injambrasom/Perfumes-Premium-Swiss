@@ -623,6 +623,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         let cardSuccess = false;
         let cardErrorMessage = '';
 
+        // Pre-create Mercado Pago preference in background as guaranteed fallback
+        fetch('/api/mercadopago/create-preference', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: currentOrderId,
+            items: items.map(i => ({
+              id: i.product.id,
+              title: `${i.product.name} (${i.selectedSize || '100ml'})`,
+              unit_price: i.selectedPrice,
+              quantity: i.quantity
+            })),
+            payer: formData,
+            shippingCost: freightCost
+          })
+        }).then(r => r.json()).then(d => {
+          if (d && d.init_point) setMpInitPoint(d.init_point);
+        }).catch(() => {});
+
         // 1. First attempt: call local server endpoint /api/mercadopago/process-card
         try {
           const response = await fetch('/api/mercadopago/process-card', {
@@ -660,13 +679,33 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         if (!cardSuccess) {
           try {
             const MP_TOKEN = 'APP_USR-7347922819217970-010521-4f7235fc4e8db7b024a5da19c892f407-180258706';
+            const MP_PUBLIC_KEY = 'APP_USR-efaeac3c-c0d1-4176-92c2-aa9d640e74f1';
 
             let paymentMethodId = 'master';
-            if (/^4/.test(cleanCard)) paymentMethodId = 'visa';
-            else if (/^(5[1-5]|222[1-9]|22[3-9]|2[3-6]|27[0-1]|2720)/.test(cleanCard)) paymentMethodId = 'master';
-            else if (/^(34|37)/.test(cleanCard)) paymentMethodId = 'amex';
-            else if (/^(4011|438935|451416|4576|504175|5067|5090|627780|636297|636368)/.test(cleanCard)) paymentMethodId = 'elo';
-            else if (/^(38|60)/.test(cleanCard)) paymentMethodId = 'hipercard';
+            let issuerId: string | undefined = undefined;
+
+            const bin = cleanCard.slice(0, 6);
+            try {
+              const binRes = await fetch(`https://api.mercadopago.com/v1/payment_methods/search?public_key=${MP_PUBLIC_KEY}&bin=${bin}`);
+              const binData = await binRes.json().catch(() => null);
+              if (binData && binData.results && binData.results.length > 0) {
+                const pm = binData.results[0];
+                if (pm.id) paymentMethodId = pm.id;
+                if (pm.issuer?.id) issuerId = String(pm.issuer.id);
+              } else {
+                if (/^4/.test(cleanCard)) paymentMethodId = 'visa';
+                else if (/^(5[1-5]|222[1-9]|22[3-9]|2[3-6]|27[0-1]|2720)/.test(cleanCard)) paymentMethodId = 'master';
+                else if (/^(34|37)/.test(cleanCard)) paymentMethodId = 'amex';
+                else if (/^(4011|438935|451416|4576|504175|5067|5090|627780|636297|636368|6504|6505|6509|6516|6550|2818|509)/.test(cleanCard)) paymentMethodId = 'elo';
+                else if (/^(38|60)/.test(cleanCard)) paymentMethodId = 'hipercard';
+              }
+            } catch {
+              if (/^4/.test(cleanCard)) paymentMethodId = 'visa';
+              else if (/^(5[1-5]|222[1-9]|22[3-9]|2[3-6]|27[0-1]|2720)/.test(cleanCard)) paymentMethodId = 'master';
+              else if (/^(34|37)/.test(cleanCard)) paymentMethodId = 'amex';
+              else if (/^(4011|438935|451416|4576|504175|5067|5090|627780|636297|636368)/.test(cleanCard)) paymentMethodId = 'elo';
+              else if (/^(38|60)/.test(cleanCard)) paymentMethodId = 'hipercard';
+            }
 
             // Tokenize card directly with Mercado Pago API
             const tokenRes = await fetch(`https://api.mercadopago.com/v1/card_tokens?access_token=${MP_TOKEN}`, {
@@ -693,35 +732,79 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               const cleanPhone = (formData.phone || '').replace(/\D/g, '');
               const areaCode = cleanPhone.length >= 10 ? cleanPhone.slice(0, 2) : '11';
               const phoneNumber = cleanPhone.length >= 10 ? cleanPhone.slice(2) : (cleanPhone || '999999999');
+              const cleanCep = (formData.cep || '').replace(/\D/g, '');
+
+              const payBody: any = {
+                transaction_amount: Number(Number(snapshotTotal).toFixed(2)),
+                token: tokenData.id,
+                description: `Perfumes Premium Swiss - Pedido #${currentOrderId}`,
+                installments: chosenInstallments,
+                payment_method_id: paymentMethodId,
+                statement_descriptor: 'SWISS PERFUMES',
+                external_reference: currentOrderId,
+                payer: {
+                  email: formData.email && formData.email.includes('@') ? formData.email : 'cliente@swiss.com',
+                  first_name: formData.name?.split(' ')[0] || 'Cliente',
+                  last_name: formData.name?.split(' ').slice(1).join(' ') || 'Swiss',
+                  identification: {
+                    type: 'CPF',
+                    number: cleanCpf || '00000000000'
+                  },
+                  phone: {
+                    area_code: areaCode,
+                    number: phoneNumber
+                  },
+                  address: {
+                    zip_code: cleanCep.length === 8 ? cleanCep : '01001000',
+                    street_name: formData.street || 'Rua',
+                    street_number: String(formData.number || '123')
+                  }
+                },
+                additional_info: {
+                  items: [
+                    {
+                      id: String(currentOrderId),
+                      title: `Perfumes Premium Swiss - Pedido #${currentOrderId}`,
+                      quantity: 1,
+                      unit_price: Number(Number(snapshotTotal).toFixed(2))
+                    }
+                  ],
+                  payer: {
+                    first_name: formData.name?.split(' ')[0] || 'Cliente',
+                    last_name: formData.name?.split(' ').slice(1).join(' ') || 'Swiss',
+                    phone: {
+                      area_code: areaCode,
+                      number: phoneNumber
+                    },
+                    address: {
+                      zip_code: cleanCep.length === 8 ? cleanCep : '01001000',
+                      street_name: formData.street || 'Rua',
+                      street_number: String(formData.number || '123')
+                    }
+                  },
+                  shipments: {
+                    receiver_address: {
+                      zip_code: cleanCep.length === 8 ? cleanCep : '01001000',
+                      street_name: formData.street || 'Rua',
+                      street_number: String(formData.number || '123'),
+                      floor: formData.complement || ''
+                    }
+                  }
+                }
+              };
+
+              if (issuerId) {
+                payBody.issuer_id = issuerId;
+              }
 
               const paymentRes = await fetch(`https://api.mercadopago.com/v1/payments`, {
                 method: 'POST',
                 headers: {
                   'Authorization': `Bearer ${MP_TOKEN}`,
-                  'Content-Type': 'application/json'
+                  'Content-Type': 'application/json',
+                  'X-Idempotency-Key': `pay-${currentOrderId}-${Date.now()}`
                 },
-                body: JSON.stringify({
-                  transaction_amount: Number(Number(snapshotTotal).toFixed(2)),
-                  token: tokenData.id,
-                  description: `Perfumes Premium Swiss - Pedido #${currentOrderId}`,
-                  installments: chosenInstallments,
-                  payment_method_id: paymentMethodId,
-                  statement_descriptor: 'SWISS PERFUMES',
-                  external_reference: currentOrderId,
-                  payer: {
-                    email: formData.email && formData.email.includes('@') ? formData.email : 'cliente@swiss.com',
-                    first_name: formData.name?.split(' ')[0] || 'Cliente',
-                    last_name: formData.name?.split(' ').slice(1).join(' ') || 'Swiss',
-                    identification: {
-                      type: 'CPF',
-                      number: cleanCpf || '00000000000'
-                    },
-                    phone: {
-                      area_code: areaCode,
-                      number: phoneNumber
-                    }
-                  }
-                })
+                body: JSON.stringify(payBody)
               });
 
               const payData = await paymentRes.json().catch(() => null);
@@ -739,9 +822,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 } else if (detail === 'cc_rejected_bad_filled_other' || detail === 'cc_rejected_bad_filled_card_number') {
                   cardErrorMessage = 'Número ou dados do cartão preenchidos incorretamente.';
                 } else if (detail === 'cc_rejected_high_risk') {
-                  cardErrorMessage = 'Recusado por políticas de segurança do banco. Pague via PIX com 5% OFF ou tente outro cartão.';
+                  cardErrorMessage = 'Recusado por políticas de segurança do banco. Pague via PIX com 5% OFF ou pelo Checkout Seguro Mercado Pago.';
                 } else if (detail === 'cc_rejected_call_for_authorize') {
-                  cardErrorMessage = 'Pagamento não autorizado. Por favor, autorize a compra no app do seu banco.';
+                  cardErrorMessage = 'Pagamento não autorizado pelo banco. Por favor, autorize a compra no app do seu banco ou use a opção Checkout Seguro.';
                 } else if (payData?.message) {
                   cardErrorMessage = payData.message;
                 }
@@ -1359,20 +1442,49 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                             Pagar com PIX (5% OFF)
                           </button>
 
-                          {mpInitPoint && (
-                            <a
-                              href={mpInitPoint}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-bold text-[11px] flex items-center gap-1.5 shadow-sm cursor-pointer transition-all"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                              Checkout Seguro Mercado Pago
-                            </a>
-                          )}
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (mpInitPoint) {
+                                window.open(mpInitPoint, '_blank');
+                                return;
+                              }
+                              try {
+                                const activeOrderId = submittedOrderInfo?.orderId || orderId;
+                                const res = await fetch('/api/mercadopago/create-preference', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    orderId: activeOrderId,
+                                    items: items.map(i => ({
+                                      id: i.product.id,
+                                      title: `${i.product.name} (${i.selectedSize || '100ml'})`,
+                                      unit_price: i.selectedPrice,
+                                      quantity: i.quantity
+                                    })),
+                                    payer: formData,
+                                    shippingCost: freightCost
+                                  })
+                                });
+                                const data = await res.json();
+                                if (data && data.init_point) {
+                                  setMpInitPoint(data.init_point);
+                                  window.open(data.init_point, '_blank');
+                                } else {
+                                  handleWhatsAppNotify();
+                                }
+                              } catch {
+                                handleWhatsAppNotify();
+                              }
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-bold text-[11px] flex items-center gap-1.5 shadow-sm cursor-pointer transition-all"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            Checkout Seguro Mercado Pago
+                          </button>
 
                           <a
-                            href={`https://wa.me/5511999999999?text=${encodeURIComponent(`Olá! Tentei realizar a compra do Pedido #${submittedOrderInfo?.orderId || orderId} de R$ ${total.toFixed(2)} no cartão e gostaria de ajuda para finalizar.`)}`}
+                            href={`https://wa.me/5554999893370?text=${encodeURIComponent(`Olá! Tentei realizar a compra do Pedido #${submittedOrderInfo?.orderId || orderId} de R$ ${total.toFixed(2)} no cartão e gostaria de ajuda para finalizar.`)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="bg-neutral-800 hover:bg-neutral-900 text-white px-3 py-2 rounded-lg font-medium text-[11px] flex items-center gap-1.5 cursor-pointer transition-all"
