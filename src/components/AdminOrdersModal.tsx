@@ -123,6 +123,8 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ isOpen, onCl
   };
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+    // Instant optimistic UI update
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
     setIsUpdatingStatus(orderId);
     try {
       await updateOrderStatusInFirebase(orderId, newStatus);
@@ -135,6 +137,8 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ isOpen, onCl
 
   const handleSaveTrackingCode = async (orderId: string) => {
     const code = trackingInputs[orderId] || '';
+    // Instant optimistic UI update
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'enviado', trackingCode: code } : o));
     setIsUpdatingStatus(orderId);
     try {
       await updateOrderStatusInFirebase(orderId, 'enviado', code);
@@ -146,9 +150,11 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ isOpen, onCl
   };
 
   const handleDeleteOrder = async (orderId: string) => {
+    // Instant optimistic UI deletion
+    setOrders(prev => prev.filter(o => o.id !== orderId));
+    setConfirmDeleteId(null);
     try {
       await deleteOrderFromFirebase(orderId);
-      setConfirmDeleteId(null);
     } catch (err) {
       console.error('Failed to delete order:', err);
     }

@@ -407,7 +407,7 @@ export function subscribeToOrders(
 
   const notify = () => {
     const list = Object.values(ordersMap).sort((a, b) => {
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
     });
     onUpdate(list);
   };
@@ -415,13 +415,27 @@ export function subscribeToOrders(
   // 1. Subscribe to Firestore orders collection
   try {
     const colRef = collection(db, 'orders');
-    const q = query(colRef, orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(
-      q,
+      colRef,
       (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'removed') {
+            delete ordersMap[change.doc.id];
+          } else {
+            const data = change.doc.data() as Order;
+            ordersMap[change.doc.id] = {
+              ...ordersMap[change.doc.id],
+              ...data,
+              id: change.doc.id
+            };
+          }
+        });
+
+        // Sync snapshot docs
         snapshot.forEach((docSnap) => {
           const data = docSnap.data() as Order;
           ordersMap[docSnap.id] = {
+            ...ordersMap[docSnap.id],
             ...data,
             id: docSnap.id
           };
@@ -429,24 +443,7 @@ export function subscribeToOrders(
         notify();
       },
       (err) => {
-        // If index not found or query fails, try basic collection
-        const fallbackUnsub = onSnapshot(
-          colRef,
-          (snapshot) => {
-            snapshot.forEach((docSnap) => {
-              const data = docSnap.data() as Order;
-              ordersMap[docSnap.id] = {
-                ...data,
-                id: docSnap.id
-              };
-            });
-            notify();
-          },
-          (error) => {
-            if (onError) onError(error);
-          }
-        );
-        unsubscribes.push(fallbackUnsub);
+        if (onError) onError(err);
       }
     );
     unsubscribes.push(unsub);
@@ -460,12 +457,22 @@ export function subscribeToOrders(
     const unsubRtdb = rtdbOnValue(ordersRtdbRef, (snapshot) => {
       const val = snapshot.val();
       if (val && typeof val === 'object') {
+        const rtdbKeys = new Set(Object.keys(val));
         Object.entries(val).forEach(([orderId, data]: [string, any]) => {
-          if (data && typeof data === 'object') {
+          if (data && typeof data === 'object' && (data.customer || data.orderNumber)) {
             ordersMap[orderId] = {
+              ...ordersMap[orderId],
               ...data,
               id: orderId
             };
+          } else if (data === null) {
+            delete ordersMap[orderId];
+          }
+        });
+        // Remove keys deleted from RTDB
+        Object.keys(ordersMap).forEach((id) => {
+          if (!rtdbKeys.has(id)) {
+            delete ordersMap[id];
           }
         });
         notify();
@@ -513,14 +520,49 @@ export async function updateOrderStatusInFirebase(
       updateData.trackingCode = trackingCode;
     }
 
-    // Update in Firestore
+    // Update in Firestore primary db with merge
     const docRef = doc(db, 'orders', orderId);
-    await updateDoc(docRef, updateData);
+    await setDoc(docRef, updateData, { merge: true });
 
-    // Update in RTDB
+    if (defaultDb !== db) {
+      try {
+        const defaultDocRef = doc(defaultDb, 'orders', orderId);
+        await setDoc(defaultDocRef, updateData, { merge: true });
+      } catch {
+        // ignore
+      }
+    }
+
+    // Update specific keys in RTDB to prevent node destruction
     try {
-      const rtdbOrderRef = rtdbRef(rtdb, `orders/${orderId}`);
-      await rtdbSet(rtdbOrderRef, updateData);
+      const rtdbStatusRef = rtdbRef(rtdb, `orders/${orderId}/status`);
+      await rtdbSet(rtdbStatusRef, status);
+      const rtdbUpdatedRef = rtdbRef(rtdb, `orders/${orderId}/updatedAt`);
+      await rtdbSet(rtdbUpdatedRef, updateData.updatedAt);
+      if (trackingCode !== undefined) {
+        const rtdbTrackRef = rtdbRef(rtdb, `orders/${orderId}/trackingCode`);
+        await rtdbSet(rtdbTrackRef, trackingCode);
+      }
+    } catch {
+      // ignore
+    }
+
+    // Update in localStorage backup
+    try {
+      const local = JSON.parse(localStorage.getItem('swiss_orders_backup') || '[]');
+      if (Array.isArray(local)) {
+        const updatedLocal = local.map((o: Order) => {
+          if (o.id === orderId) {
+            return {
+              ...o,
+              status,
+              ...(trackingCode !== undefined ? { trackingCode } : {})
+            };
+          }
+          return o;
+        });
+        localStorage.setItem('swiss_orders_backup', JSON.stringify(updatedLocal));
+      }
     } catch {
       // ignore
     }
@@ -538,6 +580,15 @@ export async function deleteOrderFromFirebase(orderId: string): Promise<void> {
     const docRef = doc(db, 'orders', orderId);
     await deleteDoc(docRef);
 
+    if (defaultDb !== db) {
+      try {
+        const defaultDocRef = doc(defaultDb, 'orders', orderId);
+        await deleteDoc(defaultDocRef);
+      } catch {
+        // ignore
+      }
+    }
+
     try {
       await rtdbSet(rtdbRef(rtdb, `orders/${orderId}`), null);
     } catch {
@@ -546,8 +597,10 @@ export async function deleteOrderFromFirebase(orderId: string): Promise<void> {
 
     try {
       const local = JSON.parse(localStorage.getItem('swiss_orders_backup') || '[]');
-      const filtered = local.filter((o: Order) => o.id !== orderId);
-      localStorage.setItem('swiss_orders_backup', JSON.stringify(filtered));
+      if (Array.isArray(local)) {
+        const filtered = local.filter((o: Order) => o.id !== orderId);
+        localStorage.setItem('swiss_orders_backup', JSON.stringify(filtered));
+      }
     } catch {
       // ignore
     }
