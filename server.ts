@@ -22,6 +22,7 @@ app.use(express.text({ type: '*/*', limit: '10mb' }));
 
 // Default Mercado Pago Access Token provided by store owner
 const DEFAULT_MP_ACCESS_TOKEN = 'APP_USR-7347922819217970-010521-4f7235fc4e8db7b024a5da19c892f407-180258706';
+const DEFAULT_MP_PUBLIC_KEY = process.env.VITE_MERCADO_PAGO_PUBLIC_KEY || 'APP_USR-259837a7-193e-4b67-850d-d423cf9e9a4c';
 
 // Helper to get Mercado Pago client safely
 function getMercadoPagoClient() {

@@ -69,7 +69,7 @@ export const Hero: React.FC<HeroProps> = ({
       subtitle: 'Escolha 3 frascos de 15ml com 36% de concentração e leve sua assinatura para onde quiser.',
       tagline: 'Apenas R$ 29,96 por unidade',
       priceText: '3x 15ml',
-      imageUrl: 'https://i.postimg.cc/L5kXHVCf/Trio-de-Bolso.jpg',
+      imageUrl: 'https://i.postimg.cc/prj0ymzT/Trio-de-Bolso.jpg',
       ctaText: 'MONTAR MEU TRIO DE BOLSO',
       ctaType: 'trio',
     },
@@ -83,7 +83,7 @@ export const Hero: React.FC<HeroProps> = ({
       subtitle: 'Uma obra-prima mineral e ambarada com açafrão dourado e âmbar cinzento radiante.',
       tagline: '36% de Essência Pura • Extrait de Parfum',
       priceText: 'R$ 130,00',
-      imageUrl: baccarat?.image || 'https://i.postimg.cc/J7mf0nkL/BACCARAT.png',
+      imageUrl: 'https://i.postimg.cc/pd74Tb46/Banner-Baccarat.png',
       ctaText: 'VER BACCARAT EM DETALHES',
       ctaType: 'product',
       productId: baccarat?.id || 'swiss-03-baccarat',
@@ -98,7 +98,7 @@ export const Hero: React.FC<HeroProps> = ({
       subtitle: 'O frescor selvagem da pimenta de Sichuan e bergamota com a potência do ambroxan.',
       tagline: 'Fixação estimada de 8h a 12h+ na pele',
       priceText: 'R$ 130,00',
-      imageUrl: salvage?.image || 'https://i.postimg.cc/4Xnrmjmf/SALVAGE.png',
+      imageUrl: 'https://i.postimg.cc/rpb3mX3Q/banner-salvage.jpg',
       ctaText: 'COMPRAR SALVAGE',
       ctaType: 'product',
       productId: salvage?.id || 'swiss-04-sauvage',
@@ -113,7 +113,7 @@ export const Hero: React.FC<HeroProps> = ({
       subtitle: 'Jasmin Sambac da Índia radiante enriquecido por madeira de cashmeran e âmbar branco.',
       tagline: 'Fragrância marcante e inesquecível',
       priceText: 'R$ 130,00',
-      imageUrl: aliem?.image || 'https://i.postimg.cc/r8QSHy1d/Aliem-Swiss-(2).png',
+      imageUrl: 'https://i.postimg.cc/0N3FQRFH/Banner-Aliem.png',
       ctaText: 'COMPRAR ALIEM',
       ctaType: 'product',
       productId: aliem?.id || 'swiss-13-aliem',
@@ -276,98 +276,167 @@ export const Hero: React.FC<HeroProps> = ({
       </motion.div>
 
       {/* CENTER CONTENT CAROUSEL STAGE */}
-      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center pt-8 lg:pt-0 w-full min-h-[420px] flex flex-col justify-between">
+      <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 text-center pt-6 lg:pt-2 w-full min-h-[460px] sm:min-h-[520px] flex flex-col justify-between">
 
         {/* Carousel Slide Wrapper */}
-        <div className="my-auto">
+        <div className="my-auto w-full relative">
+          {/* Side Floating Navigation Arrows (Desktop & Tablet) */}
+          <button
+            onClick={handlePrev}
+            aria-label="Banner anterior"
+            className="absolute -left-3 sm:-left-5 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
+          >
+            <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 transform group-hover:-translate-x-0.5 transition-transform" />
+          </button>
+
+          <button
+            onClick={handleNext}
+            aria-label="Próximo banner"
+            className="absolute -right-3 sm:-right-5 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
+          >
+            <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 transform group-hover:translate-x-0.5 transition-transform" />
+          </button>
+
           <AnimatePresence mode="wait">
-            <motion.div
-              key={currentSlide.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.5, ease: 'easeOut' }}
-              className="space-y-4"
-            >
-              {/* Subtle Luxury Badge */}
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[#C5A059]/40 bg-black/70 backdrop-blur-md">
-                {renderBadgeIcon(currentSlide.badgeIcon)}
-                <span className="text-[10px] sm:text-[11px] font-sans tracking-[0.25em] uppercase text-neutral-200 font-light">
-                  {currentSlide.badge}
-                </span>
-              </div>
+            {currentSlide.imageUrl ? (
+              /* FULL SIZE E-COMMERCE WEBSITE BANNER */
+              <motion.div
+                key={currentSlide.id}
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.45, ease: 'easeOut' }}
+                onClick={() => handleCtaClick(currentSlide)}
+                className="relative w-full h-[300px] xs:h-[350px] sm:h-[420px] md:h-[480px] lg:h-[520px] rounded-2xl overflow-hidden border border-[#C5A059]/50 bg-black shadow-[0_25px_60px_rgba(0,0,0,0.95)] cursor-pointer group"
+              >
+                {/* Full-width Banner Image */}
+                <img
+                  src={currentSlide.imageUrl}
+                  alt={currentSlide.title}
+                  className="w-full h-full object-cover object-center group-hover:scale-[1.02] transition-transform duration-700"
+                />
 
-              {/* Main Slide Title */}
-              <h1 className="font-serif text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-normal tracking-wide text-white leading-[1.12] max-w-4xl mx-auto drop-shadow-[0_4px_30px_rgba(0,0,0,0.95)]">
-                {currentSlide.title}{' '}
-                {currentSlide.highlightText && (
-                  <span className="text-[#C5A059] italic font-serif underline decoration-[#C5A059]/40 decoration-2 underline-offset-4">
-                    {currentSlide.highlightText}
-                  </span>
-                )}
-              </h1>
+                {/* Luxury Gradient Overlay to ensure text readability on any banner */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent sm:bg-gradient-to-r sm:from-black/90 sm:via-black/50 sm:to-transparent flex flex-col justify-end sm:justify-center p-4 sm:p-8 md:p-12 text-left pointer-events-none">
+                  <div className="max-w-xl pointer-events-auto space-y-2 sm:space-y-3">
+                    {/* Badge */}
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[#C5A059]/60 bg-black/80 backdrop-blur-md shadow-lg">
+                      {renderBadgeIcon(currentSlide.badgeIcon)}
+                      <span className="text-[10px] sm:text-[11px] font-sans tracking-[0.2em] uppercase text-neutral-200 font-medium">
+                        {currentSlide.badge}
+                      </span>
+                    </div>
 
-              {/* Optional Slide Featured Image (e.g., Trio de Bolso or Bottles) */}
-              {currentSlide.imageUrl && (
-                <motion.div 
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.4 }}
-                  className="pt-2 pb-1 flex justify-center"
-                >
-                  <div className="relative group max-w-[240px] sm:max-w-[280px] md:max-w-[320px] rounded-2xl overflow-hidden border border-[#C5A059]/40 bg-black/60 p-2 shadow-2xl backdrop-blur-md">
-                    <img
-                      src={currentSlide.imageUrl}
-                      alt={currentSlide.title}
-                      className="w-full h-auto max-h-[220px] sm:max-h-[260px] object-cover rounded-xl drop-shadow-[0_10px_20px_rgba(0,0,0,0.9)] transform group-hover:scale-105 transition-transform duration-500"
-                    />
-                    {currentSlide.priceText && (
-                      <div className="absolute top-4 right-4 bg-[#C5A059] text-black font-bold text-xs px-3 py-1 rounded-full shadow-lg">
-                        {currentSlide.priceText}
+                    {/* Title */}
+                    <h2 className="font-serif text-xl sm:text-3xl md:text-4xl lg:text-5xl font-normal tracking-wide text-white leading-tight drop-shadow-[0_4px_20px_rgba(0,0,0,0.95)]">
+                      {currentSlide.title}{' '}
+                      {currentSlide.highlightText && (
+                        <span className="text-[#C5A059] italic font-serif">
+                          {currentSlide.highlightText}
+                        </span>
+                      )}
+                    </h2>
+
+                    {/* Subtitle & Tagline */}
+                    <p className="text-xs sm:text-sm md:text-base text-neutral-200 font-light leading-relaxed drop-shadow-md max-w-lg line-clamp-2 sm:line-clamp-none">
+                      {currentSlide.subtitle}
+                    </p>
+
+                    {currentSlide.tagline && (
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-[11px] sm:text-xs font-medium tracking-wide text-neutral-200 backdrop-blur-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
+                        <span>{currentSlide.tagline}</span>
                       </div>
                     )}
+
+                    {/* Buttons & Price Tag */}
+                    <div className="pt-2 flex flex-wrap items-center gap-3">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCtaClick(currentSlide);
+                        }}
+                        className="px-6 sm:px-8 py-3 bg-white text-black hover:bg-[#C5A059] transition-all duration-300 rounded-none text-xs sm:text-sm font-bold tracking-[0.2em] uppercase flex items-center gap-2.5 shadow-2xl cursor-pointer group"
+                      >
+                        <span>{currentSlide.ctaText}</span>
+                        <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+                      </button>
+
+                      {currentSlide.priceText && (
+                        <span className="px-4 py-2 rounded-full bg-black/80 border border-[#C5A059]/60 text-[#C5A059] font-bold text-xs sm:text-sm shadow-xl backdrop-blur-md">
+                          {currentSlide.priceText}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </motion.div>
-              )}
+                </div>
+              </motion.div>
+            ) : (
+              /* BRAND EDITORIAL HERO (SLIDE 1 / PROMO) */
+              <motion.div
+                key={currentSlide.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.5, ease: 'easeOut' }}
+                className="space-y-5 max-w-4xl mx-auto py-4 sm:py-8"
+              >
+                {/* Subtle Luxury Badge */}
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[#C5A059]/40 bg-black/70 backdrop-blur-md">
+                  {renderBadgeIcon(currentSlide.badgeIcon)}
+                  <span className="text-[10px] sm:text-[11px] font-sans tracking-[0.25em] uppercase text-neutral-200 font-light">
+                    {currentSlide.badge}
+                  </span>
+                </div>
 
-              {/* Subtitle & Tagline */}
-              <div className="space-y-2 max-w-2xl mx-auto">
-                <p className="text-xs sm:text-base md:text-lg font-sans font-light tracking-wide text-neutral-200 leading-relaxed">
-                  {currentSlide.subtitle}
-                </p>
-                {currentSlide.tagline && (
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium tracking-wider text-neutral-300">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
-                    <span>{currentSlide.tagline}</span>
-                  </div>
-                )}
-              </div>
+                {/* Main Slide Title */}
+                <h1 className="font-serif text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-normal tracking-wide text-white leading-[1.12] max-w-4xl mx-auto drop-shadow-[0_4px_30px_rgba(0,0,0,0.95)]">
+                  {currentSlide.title}{' '}
+                  {currentSlide.highlightText && (
+                    <span className="text-[#C5A059] italic font-serif underline decoration-[#C5A059]/40 decoration-2 underline-offset-4">
+                      {currentSlide.highlightText}
+                    </span>
+                  )}
+                </h1>
 
-              {/* CTAs */}
-              <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
-                <button
-                  onClick={() => handleCtaClick(currentSlide)}
-                  className="w-full sm:w-auto px-8 py-3.5 bg-white text-black hover:bg-[#C5A059] transition-all duration-300 rounded-none text-xs font-bold tracking-[0.2em] uppercase flex items-center justify-center gap-2.5 shadow-2xl cursor-pointer group"
-                >
-                  <span>{currentSlide.ctaText}</span>
-                  <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
-                </button>
+                {/* Subtitle & Tagline */}
+                <div className="space-y-3 max-w-2xl mx-auto">
+                  <p className="text-xs sm:text-base md:text-lg font-sans font-light tracking-wide text-neutral-200 leading-relaxed">
+                    {currentSlide.subtitle}
+                  </p>
+                  {currentSlide.tagline && (
+                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs sm:text-sm font-medium tracking-wider text-neutral-300">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
+                      <span>{currentSlide.tagline}</span>
+                    </div>
+                  )}
+                </div>
 
-                <button
-                  onClick={onOpenWhatsApp}
-                  className="text-xs text-neutral-300 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer font-light tracking-wider py-2"
-                >
-                  <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Falar no WhatsApp</span>
-                </button>
-              </div>
+                {/* CTAs */}
+                <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
+                  <button
+                    onClick={() => handleCtaClick(currentSlide)}
+                    className="w-full sm:w-auto px-8 py-3.5 bg-white text-black hover:bg-[#C5A059] transition-all duration-300 rounded-none text-xs sm:text-sm font-bold tracking-[0.2em] uppercase flex items-center justify-center gap-2.5 shadow-2xl cursor-pointer group"
+                  >
+                    <span>{currentSlide.ctaText}</span>
+                    <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+                  </button>
 
-            </motion.div>
+                  <button
+                    onClick={onOpenWhatsApp}
+                    className="text-xs sm:text-sm text-neutral-300 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer font-light tracking-wider py-2"
+                  >
+                    <MessageCircle className="w-4 h-4 text-emerald-400" />
+                    <span>Falar no WhatsApp</span>
+                  </button>
+                </div>
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
 
-        {/* Bottom Carousel Controls (Indicators + Arrows) */}
-        <div className="relative z-20 pt-6 pb-2 flex items-center justify-center gap-4">
+        {/* Bottom Carousel Controls (Indicators) */}
+        <div className="relative z-20 pt-5 pb-2 flex items-center justify-center gap-4">
           <button
             onClick={handlePrev}
             aria-label="Anterior"
@@ -384,9 +453,9 @@ export const Hero: React.FC<HeroProps> = ({
                 aria-label={`Slide ${idx + 1}`}
                 className="group relative py-2 cursor-pointer"
               >
-                <div className={`h-1.5 rounded-full transition-all duration-500 ${
+                <div className={`h-2 rounded-full transition-all duration-500 ${
                   idx === currentIndex
-                    ? 'w-8 bg-[#C5A059] shadow-[0_0_10px_rgba(197,160,89,0.8)]'
+                    ? 'w-9 bg-[#C5A059] shadow-[0_0_12px_rgba(197,160,89,0.9)]'
                     : 'w-2.5 bg-white/30 hover:bg-white/60'
                 }`} />
               </button>
