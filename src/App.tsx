@@ -242,11 +242,13 @@ export default function App() {
 
       {/* Main Content */}
       <main className="w-full max-w-full overflow-x-hidden">
-        {/* 1. Hero Section */}
+        {/* 1. Hero Section (Unified Auto-Sliding Banner Carousel) */}
         <Hero
           onChoosePerfume={handleChoosePerfumeScroll}
           onOpenWhatsApp={handleWhatsAppDirect}
           onOpenTrioBuilder={() => setIsTrioModalOpen(true)}
+          products={products}
+          onQuickView={(p) => setSelectedProduct(p)}
         />
 
         {/* 2. Destaques & Catálogo Principal */}
