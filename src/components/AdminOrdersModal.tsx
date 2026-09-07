@@ -24,7 +24,9 @@ import {
   Key,
   ShieldCheck,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  CreditCard,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Order, OrderStatus } from '../types';
@@ -55,6 +57,7 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ isOpen, onCl
   const [copiedAddressId, setCopiedAddressId] = useState<string | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [generatingLinkOrderId, setGeneratingLinkOrderId] = useState<string | null>(null);
   const [showChangePin, setShowChangePin] = useState(false);
   const [newPin, setNewPin] = useState('');
   const [pinSuccessMsg, setPinSuccessMsg] = useState('');
@@ -180,6 +183,40 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ isOpen, onCl
       `🔗 *Rastreamento Correios:* https://rastreamento.correios.com.br/app/index.php\n\n` +
       `Seus frascos de Extrait de Parfum foram embalados com todo o cuidado para você ter uma experiência olfativa inesquecível.\n\n` +
       `Qualquer dúvida estamos sempre à disposição!`;
+
+    const url = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
+  const handleSendWhatsAppPaymentLink = async (order: Order) => {
+    const cleanPhone = order.customer.phone.replace(/\D/g, '');
+    setGeneratingLinkOrderId(order.id);
+    let payLink = '';
+
+    try {
+      const res = await fetch('/api/mercadopago/create-preference', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: order.orderNumber,
+          total: order.total,
+          payer: order.customer
+        })
+      });
+      const data = await res.json();
+      if (data && data.init_point) {
+        payLink = data.init_point;
+      }
+    } catch (e) {
+      console.error('Error generating payment link:', e);
+    } finally {
+      setGeneratingLinkOrderId(null);
+    }
+
+    const message = `Olá *${order.customer.name}*! Tudo bem?\n\n` +
+      `Aqui é da equipe *Perfumes Premium Swiss* referente ao seu pedido *#${order.orderNumber}* no valor de *R$ ${order.total.toFixed(2).replace('.', ',')}*.\n\n` +
+      (payLink ? `💳 *Link Oficial Seguro do Mercado Pago para Pagamento:* \n${payLink}\n\n(Você pode parcelar no cartão em até 2x sem juros ou pagar via PIX)\n\n` : '') +
+      `Seus frascos já estão separados com todo carinho! Se tiver qualquer dúvida ou preferir pagar diretamente via chave PIX, estamos à sua total disposição por aqui!`;
 
     const url = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
@@ -565,6 +602,25 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ isOpen, onCl
                             <p className="text-neutral-400">CPF: <span className="text-neutral-200 font-mono">{order.customer.cpf}</span></p>
                             <p className="text-neutral-400">Telefone: <span className="text-neutral-200 font-mono">{order.customer.phone}</span></p>
                             <p className="text-neutral-400">E-mail: <span className="text-neutral-200">{order.customer.email}</span></p>
+
+                            {order.status === 'pendente' && (
+                              <div className="pt-2 border-t border-neutral-800/80">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendWhatsAppPaymentLink(order)}
+                                  disabled={generatingLinkOrderId === order.id}
+                                  className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-[#009EE3]/20 hover:bg-[#009EE3]/30 text-[#009EE3] hover:text-white text-[11px] font-bold rounded border border-[#009EE3]/40 transition-colors cursor-pointer"
+                                  title="Enviar link seguro de pagamento do Mercado Pago para o cliente concluir no cartão em até 2x ou PIX"
+                                >
+                                  {generatingLinkOrderId === order.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <CreditCard className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>{generatingLinkOrderId === order.id ? 'Gerando Link...' : 'Enviar Link Mercado Pago no WhatsApp'}</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
 
                           {/* Col 2: Shipping address */}

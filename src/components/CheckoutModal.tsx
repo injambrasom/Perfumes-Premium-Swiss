@@ -18,7 +18,8 @@ import {
   ShoppingBag,
   HelpCircle,
   AlertCircle,
-  ExternalLink
+  ExternalLink,
+  Loader2
 } from 'lucide-react';
 import { CartItem, Order } from '../types';
 import { deductStockInFirebase, saveOrderToFirebase, updateOrderStatusInFirebase } from '../lib/firebase';
@@ -103,7 +104,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onOpenPolicy
 }) => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix');
-  const [step, setStep] = useState<'form' | 'processing' | 'pix_generated' | 'card_redirect' | 'success'>('form');
+  const [step, setStep] = useState<'form' | 'processing' | 'pix_generated' | 'success'>('form');
   const [orderSummaryOpen, setOrderSummaryOpen] = useState(false);
   const [copiedPix, setCopiedPix] = useState(false);
   const [timer, setTimer] = useState(900); // 15 minutes countdown for Pix
@@ -112,8 +113,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [pixQrCodeBase64, setPixQrCodeBase64] = useState<string | null>(null);
   const [pixQrCodeString, setPixQrCodeString] = useState<string | null>(null);
   const [pixPaymentId, setPixPaymentId] = useState<string | number | null>(null);
-  const [mpInitPoint, setMpInitPoint] = useState<string | null>(null);
   const [mpError, setMpError] = useState<string | null>(null);
+  const [mpPublicKey, setMpPublicKey] = useState<string>('APP_USR-7365e556-6445-41c0-b5a0-107fad46bd5c');
 
   // Snapshot of submitted order to prevent items being wiped out by onClearCart
   const [submittedOrderInfo, setSubmittedOrderInfo] = useState<{
@@ -171,6 +172,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       const randomNum = Math.floor(10000 + Math.random() * 90000);
       setOrderId(`SWISS-${randomNum}`);
       setMpError(null);
+
+      // Fetch official Mercado Pago public key from server
+      fetch('/api/mercadopago/public-key')
+        .then(r => r.json())
+        .then(d => {
+          if (d && d.publicKey) setMpPublicKey(d.publicKey);
+        })
+        .catch(() => {});
     } else {
       // Reset form on modal close if needed
       if (step === 'success') {
@@ -451,7 +460,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (!formData.number.trim()) errors.number = 'Número é obrigatório';
 
     if (paymentMethod === 'credit_card') {
-      // With Mercado Pago Checkout Pro, card details are securely captured directly by Mercado Pago's gateway
+      const cleanCard = formData.cardNumber.replace(/\D/g, '');
+      if (!cleanCard || cleanCard.length < 13) {
+        errors.cardNumber = 'Número do cartão inválido';
+      }
+      if (!formData.cardName?.trim()) {
+        errors.cardName = 'Nome impresso no cartão é obrigatório';
+      }
+      const cleanExp = formData.cardExpiry.replace(/\D/g, '');
+      if (!cleanExp || cleanExp.length < 4) {
+        errors.cardExpiry = 'Validade inválida (MM/AA)';
+      }
+      const cleanCvv = formData.cardCvv.replace(/\D/g, '');
+      if (!cleanCvv || cleanCvv.length < 3) {
+        errors.cardCvv = 'CVV inválido';
+      }
     }
 
     setFormErrors(errors);
@@ -623,92 +646,62 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         let cardSuccess = false;
         let cardErrorMessage = '';
 
-        // Pre-create Mercado Pago preference in background as guaranteed fallback
-        fetch('/api/mercadopago/create-preference', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            orderId: currentOrderId,
-            items: items.map(i => ({
-              id: i.product.id,
-              title: `${i.product.name} (${i.selectedSize || '100ml'})`,
-              unit_price: i.selectedPrice,
-              quantity: i.quantity
-            })),
-            payer: formData,
-            shippingCost: freightCost
-          })
-        }).then(r => r.json()).then(d => {
-          if (d && d.init_point) setMpInitPoint(d.init_point);
-        }).catch(() => {});
+        // Capture device session ID for fraud prevention (Mercado Pago security.js)
+        const deviceId = (window as any).MP_DEVICE_SESSION_ID || '';
 
-        // 1. First attempt: call local server endpoint /api/mercadopago/process-card
+        // Step 1: Detect Card Brand & Issuer via Mercado Pago BIN search API
+        let paymentMethodId = 'master';
+        let issuerId: string | undefined = undefined;
+        const bin = cleanCard.slice(0, 6);
+
         try {
-          const response = await fetch('/api/mercadopago/process-card', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              transaction_amount: snapshotTotal,
-              card: {
-                number: cleanCard,
-                holder_name: formData.cardName || formData.name,
-                expiration_month: expMonth,
-                expiration_year: expYear,
-                cvv: cleanCvv,
-                doc_number: cleanCpf
-              },
-              installments: chosenInstallments,
-              description: `Perfumes Premium Swiss - Pedido #${currentOrderId}`,
-              payer: formData,
-              orderId: currentOrderId
-            })
-          });
-
-          const resData = await response.json().catch(() => null);
-
-          if (response.ok && resData && resData.success) {
-            cardSuccess = true;
+          const binRes = await fetch(`https://api.mercadopago.com/v1/payment_methods/search?public_key=${mpPublicKey}&bin=${bin}`);
+          const binData = await binRes.json().catch(() => null);
+          if (binData && binData.results && binData.results.length > 0) {
+            const pm = binData.results.find((r: any) => r.payment_type_id === 'credit_card') || binData.results[0];
+            if (pm?.id) paymentMethodId = pm.id;
+            if (pm?.issuer?.id) issuerId = String(pm.issuer.id);
           } else {
-            cardErrorMessage = resData?.message || 'Falha ao autorizar pagamento no cartão.';
+            if (/^4/.test(cleanCard)) paymentMethodId = 'visa';
+            else if (/^(5[1-5]|222[1-9]|22[3-9]|2[3-6]|27[0-1]|2720)/.test(cleanCard)) paymentMethodId = 'master';
+            else if (/^(34|37)/.test(cleanCard)) paymentMethodId = 'amex';
+            else if (/^(4011|438935|451416|4576|504175|5067|5090|627780|636297|636368|6504|6505|6509|6516|6550|2818|509)/.test(cleanCard)) paymentMethodId = 'elo';
+            else if (/^(38|60)/.test(cleanCard)) paymentMethodId = 'hipercard';
           }
-        } catch (serverErr) {
-          console.warn('Server process-card unavailable, trying direct client-side Mercado Pago API:', serverErr);
+        } catch {
+          if (/^4/.test(cleanCard)) paymentMethodId = 'visa';
+          else if (/^(5[1-5]|222[1-9]|22[3-9]|2[3-6]|27[0-1]|2720)/.test(cleanCard)) paymentMethodId = 'master';
+          else if (/^(34|37)/.test(cleanCard)) paymentMethodId = 'amex';
+          else if (/^(4011|438935|451416|4576|504175|5067|5090|627780|636297|636368)/.test(cleanCard)) paymentMethodId = 'elo';
+          else if (/^(38|60)/.test(cleanCard)) paymentMethodId = 'hipercard';
         }
 
-        // 2. Second attempt (Client-side fallback directly to Mercado Pago REST API for Vercel/Production)
-        if (!cardSuccess) {
+        // Step 2: Generate Card Token (Directly on client with Mercado Pago SDK or REST API)
+        let clientCardToken: string | null = null;
+
+        if (typeof (window as any).MercadoPago !== 'undefined') {
           try {
-            const MP_TOKEN = 'APP_USR-7347922819217970-010521-4f7235fc4e8db7b024a5da19c892f407-180258706';
-            const MP_PUBLIC_KEY = 'APP_USR-efaeac3c-c0d1-4176-92c2-aa9d640e74f1';
-
-            let paymentMethodId = 'master';
-            let issuerId: string | undefined = undefined;
-
-            const bin = cleanCard.slice(0, 6);
-            try {
-              const binRes = await fetch(`https://api.mercadopago.com/v1/payment_methods/search?public_key=${MP_PUBLIC_KEY}&bin=${bin}`);
-              const binData = await binRes.json().catch(() => null);
-              if (binData && binData.results && binData.results.length > 0) {
-                const pm = binData.results[0];
-                if (pm.id) paymentMethodId = pm.id;
-                if (pm.issuer?.id) issuerId = String(pm.issuer.id);
-              } else {
-                if (/^4/.test(cleanCard)) paymentMethodId = 'visa';
-                else if (/^(5[1-5]|222[1-9]|22[3-9]|2[3-6]|27[0-1]|2720)/.test(cleanCard)) paymentMethodId = 'master';
-                else if (/^(34|37)/.test(cleanCard)) paymentMethodId = 'amex';
-                else if (/^(4011|438935|451416|4576|504175|5067|5090|627780|636297|636368|6504|6505|6509|6516|6550|2818|509)/.test(cleanCard)) paymentMethodId = 'elo';
-                else if (/^(38|60)/.test(cleanCard)) paymentMethodId = 'hipercard';
-              }
-            } catch {
-              if (/^4/.test(cleanCard)) paymentMethodId = 'visa';
-              else if (/^(5[1-5]|222[1-9]|22[3-9]|2[3-6]|27[0-1]|2720)/.test(cleanCard)) paymentMethodId = 'master';
-              else if (/^(34|37)/.test(cleanCard)) paymentMethodId = 'amex';
-              else if (/^(4011|438935|451416|4576|504175|5067|5090|627780|636297|636368)/.test(cleanCard)) paymentMethodId = 'elo';
-              else if (/^(38|60)/.test(cleanCard)) paymentMethodId = 'hipercard';
+            const mp = new (window as any).MercadoPago(mpPublicKey, { advancedFraudPrevention: true });
+            const tokenResult = await mp.createCardToken({
+              cardNumber: cleanCard,
+              cardholderName: (formData.cardName || formData.name).toUpperCase(),
+              cardExpirationMonth: String(expMonth).padStart(2, '0'),
+              cardExpirationYear: String(expYear),
+              securityCode: cleanCvv,
+              identificationType: cleanCpf.length === 14 ? 'CNPJ' : 'CPF',
+              identificationNumber: cleanCpf
+            });
+            if (tokenResult && tokenResult.id) {
+              clientCardToken = tokenResult.id;
             }
+          } catch (sdkErr) {
+            console.warn('SDK tokenization fallback to direct API:', sdkErr);
+          }
+        }
 
-            // Tokenize card directly with Mercado Pago API
-            const tokenRes = await fetch(`https://api.mercadopago.com/v1/card_tokens?access_token=${MP_TOKEN}`, {
+        if (!clientCardToken) {
+          try {
+            const tokenRes = await fetch(`https://api.mercadopago.com/v1/card_tokens?public_key=${mpPublicKey}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -719,141 +712,94 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 cardholder: {
                   name: (formData.cardName || formData.name || 'CLIENTE').toUpperCase(),
                   identification: {
-                    type: 'CPF',
+                    type: cleanCpf.length === 14 ? 'CNPJ' : 'CPF',
                     number: cleanCpf || '00000000000'
                   }
                 }
               })
             });
-
             const tokenData = await tokenRes.json().catch(() => null);
-
-            if (tokenRes.ok && tokenData && tokenData.id) {
-              const cleanPhone = (formData.phone || '').replace(/\D/g, '');
-              const areaCode = cleanPhone.length >= 10 ? cleanPhone.slice(0, 2) : '11';
-              const phoneNumber = cleanPhone.length >= 10 ? cleanPhone.slice(2) : (cleanPhone || '999999999');
-              const cleanCep = (formData.cep || '').replace(/\D/g, '');
-
-              const payBody: any = {
-                transaction_amount: Number(Number(snapshotTotal).toFixed(2)),
-                token: tokenData.id,
-                description: `Perfumes Premium Swiss - Pedido #${currentOrderId}`,
-                installments: chosenInstallments,
-                payment_method_id: paymentMethodId,
-                statement_descriptor: 'SWISS PERFUMES',
-                external_reference: currentOrderId,
-                payer: {
-                  email: formData.email && formData.email.includes('@') ? formData.email : 'cliente@swiss.com',
-                  first_name: formData.name?.split(' ')[0] || 'Cliente',
-                  last_name: formData.name?.split(' ').slice(1).join(' ') || 'Swiss',
-                  identification: {
-                    type: 'CPF',
-                    number: cleanCpf || '00000000000'
-                  },
-                  phone: {
-                    area_code: areaCode,
-                    number: phoneNumber
-                  },
-                  address: {
-                    zip_code: cleanCep.length === 8 ? cleanCep : '01001000',
-                    street_name: formData.street || 'Rua',
-                    street_number: String(formData.number || '123')
-                  }
-                },
-                additional_info: {
-                  items: [
-                    {
-                      id: String(currentOrderId),
-                      title: `Perfumes Premium Swiss - Pedido #${currentOrderId}`,
-                      quantity: 1,
-                      unit_price: Number(Number(snapshotTotal).toFixed(2))
-                    }
-                  ],
-                  payer: {
-                    first_name: formData.name?.split(' ')[0] || 'Cliente',
-                    last_name: formData.name?.split(' ').slice(1).join(' ') || 'Swiss',
-                    phone: {
-                      area_code: areaCode,
-                      number: phoneNumber
-                    },
-                    address: {
-                      zip_code: cleanCep.length === 8 ? cleanCep : '01001000',
-                      street_name: formData.street || 'Rua',
-                      street_number: String(formData.number || '123')
-                    }
-                  },
-                  shipments: {
-                    receiver_address: {
-                      zip_code: cleanCep.length === 8 ? cleanCep : '01001000',
-                      street_name: formData.street || 'Rua',
-                      street_number: String(formData.number || '123'),
-                      floor: formData.complement || ''
-                    }
-                  }
-                }
-              };
-
-              if (issuerId) {
-                payBody.issuer_id = issuerId;
-              }
-
-              const paymentRes = await fetch(`https://api.mercadopago.com/v1/payments`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${MP_TOKEN}`,
-                  'Content-Type': 'application/json',
-                  'X-Idempotency-Key': `pay-${currentOrderId}-${Date.now()}`
-                },
-                body: JSON.stringify(payBody)
-              });
-
-              const payData = await paymentRes.json().catch(() => null);
-
-              if (paymentRes.ok && payData && (payData.status === 'approved' || payData.status === 'in_process')) {
-                cardSuccess = true;
-              } else {
-                const detail = payData?.status_detail;
-                if (detail === 'cc_rejected_insufficient_amount') {
-                  cardErrorMessage = 'Saldo ou limite insuficiente no cartão.';
-                } else if (detail === 'cc_rejected_bad_filled_security_code') {
-                  cardErrorMessage = 'Código de segurança (CVV) do cartão incorreto.';
-                } else if (detail === 'cc_rejected_bad_filled_date') {
-                  cardErrorMessage = 'Data de validade do cartão incorreta.';
-                } else if (detail === 'cc_rejected_bad_filled_other' || detail === 'cc_rejected_bad_filled_card_number') {
-                  cardErrorMessage = 'Número ou dados do cartão preenchidos incorretamente.';
-                } else if (detail === 'cc_rejected_high_risk') {
-                  cardErrorMessage = 'Recusado por políticas de segurança do banco. Pague via PIX com 5% OFF ou pelo Checkout Seguro Mercado Pago.';
-                } else if (detail === 'cc_rejected_call_for_authorize') {
-                  cardErrorMessage = 'Pagamento não autorizado pelo banco. Por favor, autorize a compra no app do seu banco ou use a opção Checkout Seguro.';
-                } else if (payData?.message) {
-                  cardErrorMessage = payData.message;
-                }
-              }
-            } else {
-              if (tokenData?.cause?.[0]?.description) {
-                cardErrorMessage = `Erro no cartão: ${tokenData.cause[0].description}`;
-              }
+            if (tokenData && tokenData.id) {
+              clientCardToken = tokenData.id;
             }
-          } catch (directCardErr: any) {
-            console.error('Direct MP card payment failed:', directCardErr);
+          } catch (apiErr) {
+            console.warn('Direct token API error:', apiErr);
           }
         }
 
-        if (cardSuccess) {
+        // Step 3: Send payment to server endpoint (/api/mercadopago/process-card)
+        const response = await fetch('/api/mercadopago/process-card', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transaction_amount: snapshotTotal,
+            token: clientCardToken,
+            deviceId: deviceId,
+            payment_method_id: paymentMethodId,
+            issuer_id: issuerId,
+            card: {
+              number: cleanCard,
+              holder_name: formData.cardName || formData.name,
+              expiration_month: expMonth,
+              expiration_year: expYear,
+              cvv: cleanCvv,
+              doc_number: cleanCpf
+            },
+            installments: chosenInstallments,
+            description: `Perfumes Premium Swiss - Pedido #${currentOrderId}`,
+            payer: formData,
+            orderId: currentOrderId
+          })
+        });
+
+        const resData = await response.json().catch(() => null);
+
+        if (response.ok && resData && (resData.success || resData.status === 'approved' || resData.status === 'in_process')) {
+          // APROVADO NA HORA! Atualiza no banco e mostra tela de sucesso imediata
+          try {
+            await updateOrderStatusInFirebase(currentOrderId, 'pago');
+          } catch (fbErr) {
+            console.warn('Erro ao atualizar status do pedido no Firebase:', fbErr);
+          }
+
           try {
             onClearCart();
           } catch {
             // ignore
           }
+
           setStep('success');
           return;
         }
 
-        setMpError(cardErrorMessage || 'Não foi possível autorizar o cartão no momento. Verifique os dados digitados ou pague via PIX com 5% de desconto.');
+        // Tratamento detalhado de recusa para mensagem amigável ao cliente
+        let userMessage = 'Pagamento não autorizado pelo banco emissor.';
+        const detail = resData?.status_detail;
+        if (detail === 'cc_rejected_insufficient_amount') {
+          userMessage = 'Saldo ou limite insuficiente no cartão.';
+        } else if (detail === 'cc_rejected_bad_filled_security_code') {
+          userMessage = 'Código de segurança (CVV) incorreto.';
+        } else if (detail === 'cc_rejected_bad_filled_date') {
+          userMessage = 'Data de validade do cartão incorreta.';
+        } else if (detail === 'cc_rejected_bad_filled_other' || detail === 'cc_rejected_bad_filled_card_number') {
+          userMessage = 'Dados do cartão preenchidos incorretamente. Verifique e tente novamente.';
+        } else if (detail === 'cc_rejected_call_for_authorize') {
+          userMessage = 'Pagamento não autorizado pelo banco. Autorize a compra pelo app do seu banco ou tente outro cartão.';
+        } else if (detail === 'cc_rejected_card_disabled') {
+          userMessage = 'Cartão bloqueado para compras na internet. Desbloqueie no app do seu banco ou tente outro cartão.';
+        } else if (detail === 'cc_rejected_high_risk') {
+          userMessage = 'Transação não autorizada pelas políticas de segurança do banco. Tente outro cartão ou opte pelo PIX com 5% de desconto.';
+        } else if (detail === 'cc_rejected_max_attempts') {
+          userMessage = 'Limite de tentativas excedido para este cartão. Por favor, utilize outro cartão.';
+        } else if (resData?.message) {
+          userMessage = resData.message;
+        }
+
+        setMpError(userMessage);
         setStep('form');
       } catch (err: any) {
         console.error('Error in direct card checkout:', err);
-        setMpError('Erro ao processar cartão. Por favor, verifique os dados ou pague via PIX.');
+        setMpError('Erro ao processar cartão. Verifique os dados digitados ou tente outro cartão.');
         setStep('form');
       }
     }
@@ -1425,11 +1371,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                           <div>
                             <p className="font-semibold text-red-900 text-xs leading-snug">{mpError}</p>
                             <p className="text-[11px] text-red-700 mt-1 leading-relaxed">
-                              Se a recusa for por política de segurança do banco (trava anti-fraude) ou autofaturamento de teste, você pode concluir seu pedido instantaneamente usando uma das opções abaixo:
+                              Verifique os dados digitados do seu cartão ou tente pagar via PIX com 5% de desconto imediato.
                             </p>
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2 pt-1 border-t border-red-200/80">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMpError(null);
+                            }}
+                            className="bg-neutral-800 hover:bg-neutral-900 text-white px-3 py-2 rounded-lg font-bold text-[11px] flex items-center gap-1.5 shadow-sm cursor-pointer transition-all"
+                          >
+                            Tentar novamente
+                          </button>
+
                           <button
                             type="button"
                             onClick={() => {
@@ -1442,54 +1398,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                             Pagar com PIX (5% OFF)
                           </button>
 
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (mpInitPoint) {
-                                window.open(mpInitPoint, '_blank');
-                                return;
-                              }
-                              try {
-                                const activeOrderId = submittedOrderInfo?.orderId || orderId;
-                                const res = await fetch('/api/mercadopago/create-preference', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    orderId: activeOrderId,
-                                    items: items.map(i => ({
-                                      id: i.product.id,
-                                      title: `${i.product.name} (${i.selectedSize || '100ml'})`,
-                                      unit_price: i.selectedPrice,
-                                      quantity: i.quantity
-                                    })),
-                                    payer: formData,
-                                    shippingCost: freightCost
-                                  })
-                                });
-                                const data = await res.json();
-                                if (data && data.init_point) {
-                                  setMpInitPoint(data.init_point);
-                                  window.open(data.init_point, '_blank');
-                                } else {
-                                  handleWhatsAppNotify();
-                                }
-                              } catch {
-                                handleWhatsAppNotify();
-                              }
-                            }}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-bold text-[11px] flex items-center gap-1.5 shadow-sm cursor-pointer transition-all"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            Checkout Seguro Mercado Pago
-                          </button>
-
                           <a
                             href={`https://wa.me/5554999893370?text=${encodeURIComponent(`Olá! Tentei realizar a compra do Pedido #${submittedOrderInfo?.orderId || orderId} de R$ ${total.toFixed(2)} no cartão e gostaria de ajuda para finalizar.`)}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="bg-neutral-800 hover:bg-neutral-900 text-white px-3 py-2 rounded-lg font-medium text-[11px] flex items-center gap-1.5 cursor-pointer transition-all"
+                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 px-3 py-2 rounded-lg font-medium text-[11px] flex items-center gap-1.5 cursor-pointer transition-all"
                           >
-                            <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                            <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
                             Ajuda no WhatsApp
                           </a>
                         </div>
@@ -1499,7 +1414,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     <div className="bg-emerald-50/80 p-3 rounded-lg border border-emerald-200 flex items-center justify-between">
                       <div className="flex items-center gap-2 text-emerald-950 font-semibold text-xs">
                         <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                        <span>Pagamento 100% Seguro no Cartão</span>
+                        <span>Pagamento 100% Seguro no Cartão • Aprovação Imediata</span>
                       </div>
                       <span className="text-[10px] bg-emerald-100 text-emerald-800 font-medium px-2 py-0.5 rounded font-mono">
                         Criptografia SSL
@@ -1674,52 +1589,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
           )}
 
-          {/* STEP: CARD REDIRECT TO MERCADO PAGO */}
-          {step === 'card_redirect' && (
-            <div className="space-y-6 py-6 text-center animate-fadeIn">
-              <div className="w-16 h-16 bg-[#009EE3]/10 text-[#009EE3] rounded-full flex items-center justify-center mx-auto ring-8 ring-[#009EE3]/5">
-                <CreditCard className="w-8 h-8" />
-              </div>
-
-              <div className="space-y-2 max-w-md mx-auto">
-                <span className="text-[11px] font-mono tracking-widest text-[#009EE3] uppercase font-bold">
-                  Mercado Pago Checkout Oficial
-                </span>
-                <h3 className="font-serif text-2xl font-bold text-neutral-900">
-                  Redirecionando para o Pagamento...
-                </h3>
-                <p className="text-xs text-neutral-600 font-light leading-relaxed">
-                  Seu pedido <strong>#{submittedOrderInfo?.orderId || orderId}</strong> no valor de <strong>R$ {(submittedOrderInfo?.total !== undefined ? submittedOrderInfo.total : finalTotal).toFixed(2).replace('.', ',')}</strong> foi registrado.
-                </p>
-                <p className="text-[11px] text-neutral-500 font-light">
-                  Se a página do Mercado Pago não abrir automaticamente, clique no botão abaixo:
-                </p>
-              </div>
-
-              <div className="space-y-3 max-w-md mx-auto pt-2">
-                {mpInitPoint && (
-                  <a
-                    href={mpInitPoint}
-                    className="w-full bg-[#009EE3] hover:bg-[#0081b8] text-white py-4 px-6 rounded-xl font-sans text-xs uppercase tracking-wider font-bold transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <Lock className="w-4 h-4" />
-                    <span>Pagar Agora no Mercado Pago</span>
-                    <ExternalLink className="w-4 h-4 ml-1" />
-                  </a>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleWhatsAppNotify}
-                  className="w-full bg-white hover:bg-neutral-50 text-neutral-800 py-3 px-4 rounded-xl border border-neutral-300 font-sans text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors"
-                >
-                  <MessageCircle className="w-4 h-4 text-[#25D366]" />
-                  <span>Notificar Pedido no WhatsApp</span>
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* STEP: PIX GENERATED SCREEN */}
           {step === 'pix_generated' && (
             <div className="space-y-6 py-2 animate-fadeIn">
@@ -1880,18 +1749,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
               {/* Action Buttons */}
               <div className="space-y-3 max-w-md mx-auto pt-2">
-                {mpInitPoint && paymentMethod === 'credit_card' && (
-                  <a
-                    href={mpInitPoint}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full bg-[#009EE3] hover:bg-[#0081b8] text-white py-3.5 px-6 rounded-xl font-sans text-xs uppercase tracking-wider font-bold transition-all shadow-md flex items-center justify-center gap-2"
-                  >
-                    <CreditCard className="w-4 h-4" />
-                    <span>Concluir Pagamento no Mercado Pago</span>
-                  </a>
-                )}
-
                 <button
                   onClick={handleWhatsAppNotify}
                   className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white py-4 px-6 rounded-xl font-sans text-sm uppercase tracking-wider font-bold transition-all shadow-xl shadow-[#25D366]/20 flex items-center justify-center gap-3 cursor-pointer animate-pulse hover:animate-none"

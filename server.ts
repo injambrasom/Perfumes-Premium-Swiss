@@ -22,7 +22,7 @@ app.use(express.text({ type: '*/*', limit: '10mb' }));
 
 // Default Mercado Pago Access Token provided by store owner
 const DEFAULT_MP_ACCESS_TOKEN = 'APP_USR-7347922819217970-010521-4f7235fc4e8db7b024a5da19c892f407-180258706';
-const DEFAULT_MP_PUBLIC_KEY = process.env.VITE_MERCADO_PAGO_PUBLIC_KEY || 'APP_USR-259837a7-193e-4b67-850d-d423cf9e9a4c';
+const DEFAULT_MP_PUBLIC_KEY = process.env.VITE_MERCADO_PAGO_PUBLIC_KEY || 'APP_USR-7365e556-6445-41c0-b5a0-107fad46bd5c';
 
 // Helper to get Mercado Pago client safely
 function getMercadoPagoClient() {
@@ -39,6 +39,16 @@ function getMercadoPagoClient() {
 // ==========================================
 // MERCADO PAGO API ENDPOINTS
 // ==========================================
+
+// Public Key Endpoint for Frontend Transparent Checkout
+app.get('/api/mercadopago/public-key', (req, res) => {
+  const publicKey = process.env.VITE_MERCADO_PAGO_PUBLIC_KEY || DEFAULT_MP_PUBLIC_KEY;
+  res.json({ publicKey });
+});
+app.get('/mercadopago/public-key', (req, res) => {
+  const publicKey = process.env.VITE_MERCADO_PAGO_PUBLIC_KEY || DEFAULT_MP_PUBLIC_KEY;
+  res.json({ publicKey });
+});
 
 // Health Check Endpoint
 app.get('/api/health', (req, res) => {
@@ -814,86 +824,101 @@ const handleProcessCard = async (req: express.Request, res: express.Response) =>
       });
     }
 
-    const { card, transaction_amount, installments, description, payer, orderId } = req.body || {};
+    const {
+      card,
+      token: clientToken,
+      deviceId,
+      payment_method_id: clientPaymentMethodId,
+      issuer_id: clientIssuerId,
+      transaction_amount,
+      installments,
+      description,
+      payer,
+      orderId
+    } = req.body || {};
 
-    if (!card || !card.number || !card.cvv || !card.expiration_month || !card.expiration_year) {
-      return res.status(400).json({
-        error: 'INVALID_CARD_DATA',
-        message: 'Preencha todos os dados do cartão (número, validade e CVV).'
-      });
-    }
+    let cardTokenId = clientToken;
+    let paymentMethodId = clientPaymentMethodId || 'master';
+    let issuerId = clientIssuerId ? String(clientIssuerId) : undefined;
 
-    const cleanCard = String(card.number).replace(/\D/g, '');
     const cleanCpf = String(payer?.cpf || card?.doc_number || '').replace(/\D/g, '');
-    const cleanCvv = String(card.cvv).trim();
-    const expMonth = parseInt(String(card.expiration_month), 10);
-    let expYear = parseInt(String(card.expiration_year), 10);
-    if (expYear < 100) expYear += 2000;
 
-    // Detect card brand and issuer accurately via Mercado Pago BIN search API
-    let paymentMethodId = 'master';
-    let issuerId: string | undefined = undefined;
+    // If card token was not created on client, generate it here
+    if (!cardTokenId) {
+      if (!card || !card.number || !card.cvv || !card.expiration_month || !card.expiration_year) {
+        return res.status(400).json({
+          error: 'INVALID_CARD_DATA',
+          message: 'Preencha todos os dados do cartão (número, validade e CVV).'
+        });
+      }
 
-    const bin = cleanCard.slice(0, 6);
-    try {
-      const binRes = await fetch(`https://api.mercadopago.com/v1/payment_methods/search?public_key=${DEFAULT_MP_PUBLIC_KEY}&bin=${bin}`);
-      const binData = await binRes.json().catch(() => null);
-      if (binData && binData.results && binData.results.length > 0) {
-        const pm = binData.results[0];
-        if (pm.id) paymentMethodId = pm.id;
-        if (pm.issuer?.id) issuerId = String(pm.issuer.id);
-      } else {
-        // Regex fallback
+      const cleanCard = String(card.number).replace(/\D/g, '');
+      const cleanCvv = String(card.cvv).trim();
+      const expMonth = parseInt(String(card.expiration_month), 10);
+      let expYear = parseInt(String(card.expiration_year), 10);
+      if (expYear < 100) expYear += 2000;
+
+      // Detect card brand and issuer accurately via Mercado Pago BIN search API
+      const bin = cleanCard.slice(0, 6);
+      try {
+        const binRes = await fetch(`https://api.mercadopago.com/v1/payment_methods/search?public_key=${DEFAULT_MP_PUBLIC_KEY}&bin=${bin}`);
+        const binData = await binRes.json().catch(() => null);
+        if (binData && binData.results && binData.results.length > 0) {
+          const pm = binData.results.find((r: any) => r.payment_type_id === 'credit_card');
+          if (pm?.id) paymentMethodId = pm.id;
+          if (pm?.issuer?.id) issuerId = String(pm.issuer.id);
+        } else {
+          if (/^4/.test(cleanCard)) paymentMethodId = 'visa';
+          else if (/^(5[1-5]|222[1-9]|22[3-9]|2[3-6]|27[0-1]|2720)/.test(cleanCard)) paymentMethodId = 'master';
+          else if (/^(34|37)/.test(cleanCard)) paymentMethodId = 'amex';
+          else if (/^(4011|438935|451416|4576|504175|5067|5090|627780|636297|636368|6504|6505|6509|6516|6550|2818|509)/.test(cleanCard)) paymentMethodId = 'elo';
+          else if (/^(38|60)/.test(cleanCard)) paymentMethodId = 'hipercard';
+        }
+      } catch {
         if (/^4/.test(cleanCard)) paymentMethodId = 'visa';
         else if (/^(5[1-5]|222[1-9]|22[3-9]|2[3-6]|27[0-1]|2720)/.test(cleanCard)) paymentMethodId = 'master';
         else if (/^(34|37)/.test(cleanCard)) paymentMethodId = 'amex';
-        else if (/^(4011|438935|451416|4576|504175|5067|5090|627780|636297|636368|6504|6505|6509|6516|6550|2818|509)/.test(cleanCard)) paymentMethodId = 'elo';
+        else if (/^(4011|438935|451416|4576|504175|5067|5090|627780|636297|636368)/.test(cleanCard)) paymentMethodId = 'elo';
         else if (/^(38|60)/.test(cleanCard)) paymentMethodId = 'hipercard';
       }
-    } catch {
-      if (/^4/.test(cleanCard)) paymentMethodId = 'visa';
-      else if (/^(5[1-5]|222[1-9]|22[3-9]|2[3-6]|27[0-1]|2720)/.test(cleanCard)) paymentMethodId = 'master';
-      else if (/^(34|37)/.test(cleanCard)) paymentMethodId = 'amex';
-      else if (/^(4011|438935|451416|4576|504175|5067|5090|627780|636297|636368)/.test(cleanCard)) paymentMethodId = 'elo';
-      else if (/^(38|60)/.test(cleanCard)) paymentMethodId = 'hipercard';
-    }
 
-    // Step 1: Create Card Token via Mercado Pago REST API
-    const tokenRes = await fetch(`https://api.mercadopago.com/v1/card_tokens?access_token=${token}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        card_number: cleanCard,
-        expiration_month: expMonth,
-        expiration_year: expYear,
-        security_code: cleanCvv,
-        cardholder: {
-          name: (card.holder_name || payer?.name || 'CLIENTE').toUpperCase(),
-          identification: {
-            type: 'CPF',
-            number: cleanCpf || '00000000000'
+      // Step 1: Create Card Token via Mercado Pago REST API using Public Key
+      const tokenRes = await fetch(`https://api.mercadopago.com/v1/card_tokens?public_key=${DEFAULT_MP_PUBLIC_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          card_number: cleanCard,
+          expiration_month: expMonth,
+          expiration_year: expYear,
+          security_code: cleanCvv,
+          cardholder: {
+            name: (card.holder_name || payer?.name || 'CLIENTE').toUpperCase(),
+            identification: {
+              type: 'CPF',
+              number: cleanCpf || '00000000000'
+            }
           }
-        }
-      })
-    });
-
-    const tokenData = await tokenRes.json().catch(() => null);
-
-    if (!tokenRes.ok || !tokenData || !tokenData.id) {
-      console.error('Erro ao gerar token do cartão no Mercado Pago:', tokenData);
-      let msg = 'Não foi possível validar o cartão de crédito.';
-      if (tokenData?.cause?.[0]?.description) {
-        msg = `Erro no cartão: ${tokenData.cause[0].description}`;
-      } else if (tokenData?.message) {
-        msg = tokenData.message;
-      }
-      return res.status(400).json({
-        error: 'CARD_TOKEN_FAILED',
-        message: msg
+        })
       });
-    }
 
-    const cardTokenId = tokenData.id;
+      const tokenData = await tokenRes.json().catch(() => null);
+
+      if (!tokenRes.ok || !tokenData || !tokenData.id) {
+        console.error('Erro ao gerar token do cartão no Mercado Pago:', tokenData);
+        let msg = 'Não foi possível validar o cartão de crédito.';
+        if (tokenData?.cause?.[0]?.description) {
+          msg = `Erro no cartão: ${tokenData.cause[0].description}`;
+        } else if (tokenData?.message) {
+          msg = tokenData.message;
+        }
+        return res.status(400).json({
+          error: 'CARD_TOKEN_FAILED',
+          message: msg
+        });
+      }
+
+      cardTokenId = tokenData.id;
+    }
 
     // Step 2: Create Payment using Mercado Pago Payment SDK
     const payment = new Payment(client);
@@ -901,6 +926,7 @@ const handleProcessCard = async (req: express.Request, res: express.Response) =>
     const areaCode = cleanPhone.length >= 10 ? cleanPhone.slice(0, 2) : '11';
     const phoneNumber = cleanPhone.length >= 10 ? cleanPhone.slice(2) : (cleanPhone || '999999999');
     const cleanCep = (payer?.cep || '').replace(/\D/g, '');
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
 
     const paymentPayload: any = {
       transaction_amount: Number(Number(transaction_amount).toFixed(2)),
@@ -929,6 +955,7 @@ const handleProcessCard = async (req: express.Request, res: express.Response) =>
         }
       },
       additional_info: {
+        ip_address: clientIp,
         items: [
           {
             id: String(orderId || 'swiss-1'),
@@ -965,13 +992,23 @@ const handleProcessCard = async (req: express.Request, res: express.Response) =>
       paymentPayload.issuer_id = issuerId;
     }
 
-    console.log('Processing Direct Credit Card Payment:', paymentPayload.payment_method_id, paymentPayload.installments, paymentPayload.transaction_amount, 'issuer:', issuerId);
+    console.log('Processing Direct Credit Card Payment:', paymentPayload.payment_method_id, 'installments:', paymentPayload.installments, 'amount:', paymentPayload.transaction_amount, 'issuer:', issuerId);
+
+    const requestHeaders: Record<string, string> = {
+      'X-Idempotency-Key': `pay-${orderId || Date.now()}-${Date.now()}`
+    };
+
+    const sessionDeviceId = deviceId || (req.headers['x-meli-session-id'] as string);
+    if (sessionDeviceId) {
+      requestHeaders['X-Meli-Session-Id'] = sessionDeviceId;
+    }
 
     const paymentResult = await payment.create({
       body: paymentPayload,
       requestOptions: {
-        idempotencyKey: `pay-${orderId || Date.now()}-${Date.now()}`
-      }
+        idempotencyKey: `pay-${orderId || Date.now()}-${Date.now()}`,
+        headers: requestHeaders
+      } as any
     });
 
     console.log('Mercado Pago Card Payment Result:', paymentResult.id, paymentResult.status, paymentResult.status_detail);
@@ -1004,9 +1041,9 @@ const handleProcessCard = async (req: express.Request, res: express.Response) =>
       } else if (detail === 'cc_rejected_bad_filled_other' || detail === 'cc_rejected_bad_filled_card_number') {
         errorMsg = 'Número ou dados do cartão preenchidos incorretamente.';
       } else if (detail === 'cc_rejected_high_risk') {
-        errorMsg = 'Recusado por políticas de segurança do banco. Tente outro cartão ou pague via PIX com 5% OFF.';
+        errorMsg = 'Recusado por validação de segurança do banco. Verifique os dados ou utilize outro cartão.';
       } else if (detail === 'cc_rejected_call_for_authorize') {
-        errorMsg = 'Pagamento não autorizado. Por favor, autorize a compra no app do seu banco.';
+        errorMsg = 'Pagamento não autorizado pelo banco emissor. Por favor, autorize a compra no app do seu banco.';
       }
 
       return res.status(400).json({
