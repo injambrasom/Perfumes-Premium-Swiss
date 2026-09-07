@@ -292,17 +292,17 @@ export const Hero: React.FC<HeroProps> = ({
           <button
             onClick={handlePrev}
             aria-label="Banner anterior"
-            className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
+            className="absolute left-1.5 sm:left-6 top-1/2 -translate-y-1/2 z-30 w-8 h-8 sm:w-14 sm:h-14 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
           >
-            <ChevronLeft className="w-6 h-6 sm:w-7 sm:h-7 transform group-hover:-translate-x-0.5 transition-transform" />
+            <ChevronLeft className="w-5 h-5 sm:w-7 sm:h-7 transform group-hover:-translate-x-0.5 transition-transform" />
           </button>
 
           <button
             onClick={handleNext}
             aria-label="Próximo banner"
-            className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
+            className="absolute right-1.5 sm:right-6 top-1/2 -translate-y-1/2 z-30 w-8 h-8 sm:w-14 sm:h-14 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
           >
-            <ChevronRight className="w-6 h-6 sm:w-7 sm:h-7 transform group-hover:translate-x-0.5 transition-transform" />
+            <ChevronRight className="w-5 h-5 sm:w-7 sm:h-7 transform group-hover:translate-x-0.5 transition-transform" />
           </button>
 
           <AnimatePresence mode="wait">
@@ -315,76 +315,85 @@ export const Hero: React.FC<HeroProps> = ({
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.4 }}
                 onClick={() => handleCtaClick(currentSlide)}
-                className="w-full max-w-[1500px] mx-auto relative overflow-hidden cursor-pointer group flex items-center justify-center bg-[#0B0B0B] min-h-[360px] sm:min-h-[480px] md:min-h-[560px]"
+                className="w-full max-w-[1500px] mx-auto relative overflow-hidden cursor-pointer group bg-[#0B0B0B]"
               >
                 {/* Full Width Banner Graphic Image - 100% Uncropped */}
                 <img
                   src={currentSlide.imageUrl}
                   alt={currentSlide.title}
-                  className="w-full max-h-[75vh] sm:max-h-[82vh] h-auto object-contain object-center transition-transform duration-700 group-hover:scale-[1.005]"
+                  className="w-full h-auto min-h-[220px] sm:min-h-0 max-h-[82vh] object-cover sm:object-contain object-center transition-transform duration-700 group-hover:scale-[1.005] block"
                 />
 
-                {/* SPECIAL HIGH-IMPACT TYPOGRAPHY OVERLAY FOR TRIO DE BOLSO BANNER - FULLY INSIDE BANNER FRAME */}
+                {/* SPECIAL HIGH-IMPACT TYPOGRAPHY OVERLAY FOR TRIO DE BOLSO BANNER */}
                 {currentSlide.id === 'trio' ? (
-                  <div className="absolute inset-0 z-20 flex flex-col justify-center items-start pl-12 sm:pl-20 md:pl-28 lg:pl-32 pr-6 py-6 sm:py-8 pointer-events-none">
-                    {/* Main High-Impact Typography (Directly on Image, Single Contained Column) */}
-                    <div className="max-w-md sm:max-w-lg text-left pointer-events-auto space-y-2 sm:space-y-3 my-auto">
-                      {/* Eyebrow & Badge */}
-                      <div className="inline-flex items-center gap-2 text-[#C5A059] font-bold text-xs sm:text-sm drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
-                        <Gift className="w-4 h-4 text-[#C5A059]" />
-                        <span className="uppercase tracking-[0.2em] font-sans text-white text-[11px] sm:text-xs">
-                          OFERTA IMPERDÍVEL • SWISS ATELIER
+                  <div className="absolute inset-0 z-20 flex flex-col justify-between p-2.5 sm:p-8 md:pl-28 md:py-12 pointer-events-none bg-gradient-to-r from-black/90 via-black/50 to-transparent sm:from-black/80 sm:via-black/30 sm:to-transparent pl-8 sm:pl-20 md:pl-28">
+                    {/* Top Row Badges */}
+                    <div className="flex items-center justify-between w-full pointer-events-auto">
+                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 sm:px-3.5 sm:py-1.5 rounded-full bg-black/80 border border-[#C5A059] text-[#C5A059] font-bold text-[8px] sm:text-xs backdrop-blur-md shadow-lg">
+                        <Gift className="w-2.5 h-2.5 sm:w-4 sm:h-4 text-[#C5A059]" />
+                        <span className="uppercase tracking-wider text-white">
+                          OFERTA IMPERDÍVEL
                         </span>
                       </div>
 
-                      <span className="text-[10px] sm:text-xs font-sans tracking-[0.25em] uppercase text-[#C5A059] font-bold block drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
+                      <div className="px-2 py-0.5 sm:px-3 sm:py-1 rounded-full bg-[#C5A059] text-black font-extrabold text-[8px] sm:text-xs uppercase shadow-lg">
+                        ECONOMIZE R$ 45,10
+                      </div>
+                    </div>
+
+                    {/* Middle Main Content */}
+                    <div className="my-auto pointer-events-auto space-y-0.5 sm:space-y-3 max-w-[80%] sm:max-w-lg text-left">
+                      <span className="text-[8px] sm:text-xs font-sans tracking-[0.15em] sm:tracking-[0.25em] uppercase text-[#C5A059] font-bold block drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">
                         MONTE SEU CONJUNTO PERSONALIZADO
                       </span>
 
-                      {/* Title with Custom Fonts */}
-                      <h2 className="font-serif text-2xl sm:text-4xl md:text-5xl font-normal text-white leading-[1.1] drop-shadow-[0_4px_20px_rgba(0,0,0,0.95)]">
-                        3 PERFUMES DE BOLSO <br />
-                        <span className="text-[#C5A059] italic font-serif text-3xl sm:text-5xl md:text-6xl font-normal drop-shadow-[0_4px_25px_rgba(0,0,0,1)]">
+                      <h2 className="font-serif text-base sm:text-4xl md:text-5xl font-normal text-white leading-tight drop-shadow-[0_4px_20px_rgba(0,0,0,1)]">
+                        3 PERFUMES DE BOLSO <br className="hidden sm:inline" />
+                        <span className="text-[#C5A059] italic font-serif text-lg sm:text-5xl md:text-6xl font-normal drop-shadow-[0_4px_25px_rgba(0,0,0,1)]">
                           POR R$ 89,90
                         </span>
                       </h2>
 
-                      {/* Promotional Sub-inscriptions */}
-                      <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                        <span className="text-[#C5A059] font-extrabold text-xs sm:text-sm tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
+                      <div className="flex flex-wrap items-center gap-1 sm:gap-2 pt-0.5">
+                        <span className="text-[#C5A059] font-extrabold text-[9px] sm:text-sm tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">
                           DE R$ 135,00 POR R$ 89,90
                         </span>
-                        <span className="text-emerald-400 font-bold text-xs sm:text-sm drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
-                          • R$ 29,96 POR UNIDADE
+                        <span className="text-emerald-400 font-bold text-[8px] sm:text-xs drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">
+                          • R$ 29,96/UN
                         </span>
                       </div>
 
-                      {/* Description Tagline */}
-                      <p className="text-xs sm:text-sm text-neutral-100 leading-relaxed font-sans font-normal max-w-xs sm:max-w-md drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
+                      <p className="text-[11px] sm:text-sm text-neutral-100 leading-snug font-sans font-normal hidden sm:block max-w-md drop-shadow-[0_2px_10px_rgba(0,0,0,1)]">
                         Escolha 3 frascos de 15ml com <strong className="text-white font-semibold">36% de Concentração Pura</strong> e leve sua assinatura olfativa onde for.
                       </p>
 
-                      {/* Main Action Button */}
-                      <div className="pt-2">
+                      <div className="pt-0.5 sm:pt-2">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleCtaClick(currentSlide);
                           }}
-                          className="px-6 sm:px-8 py-3 bg-[#C5A059] hover:bg-white text-black transition-all duration-300 text-xs sm:text-sm font-extrabold tracking-[0.2em] uppercase flex items-center gap-2.5 shadow-[0_10px_25px_rgba(0,0,0,0.8)] cursor-pointer group rounded-none"
+                          className="px-3 py-1.5 sm:px-8 sm:py-3 bg-[#C5A059] hover:bg-white text-black transition-all duration-300 text-[9px] sm:text-sm font-extrabold tracking-wider sm:tracking-[0.2em] uppercase flex items-center gap-1.5 shadow-2xl cursor-pointer group rounded-none"
                         >
                           <span>MONTAR MEU TRIO DE BOLSO</span>
-                          <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1.5 transition-transform" />
+                          <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 transform group-hover:translate-x-1 transition-transform" />
                         </button>
                       </div>
+                    </div>
+
+                    {/* Bottom Features Strip */}
+                    <div className="hidden sm:flex items-center gap-4 text-xs font-medium text-neutral-200 pointer-events-auto drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">
+                      <span>✓ 15ml cada frasco</span>
+                      <span>✓ Fixação 8h-12h+</span>
+                      <span>✓ Envio Imediato</span>
                     </div>
                   </div>
                 ) : (
                   /* DEFAULT OVERLAY FOR PRODUCT BANNERS (BACCARAT, SALVAGE, ALIEM) */
                   <>
                     {/* Top Promo Badge Overlay */}
-                    <div className="absolute top-3 left-12 sm:top-5 sm:left-20 md:left-28 z-20 pointer-events-auto flex flex-col items-start gap-1">
-                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/90 border border-[#C5A059]/70 text-[#C5A059] font-bold text-[11px] sm:text-xs shadow-2xl backdrop-blur-md">
+                    <div className="absolute top-3 left-8 sm:top-5 sm:left-20 md:left-28 z-20 pointer-events-auto flex flex-col items-start gap-1">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-black/90 border border-[#C5A059]/70 text-[#C5A059] font-bold text-[9px] sm:text-xs shadow-2xl backdrop-blur-md">
                         {renderBadgeIcon(currentSlide.badgeIcon)}
                         <span className="uppercase tracking-wider text-white">
                           {currentSlide.badge}
@@ -393,20 +402,20 @@ export const Hero: React.FC<HeroProps> = ({
                     </div>
 
                     {/* Floating Interactive CTA Button */}
-                    <div className="absolute bottom-4 left-12 right-4 sm:left-20 md:left-28 sm:right-auto sm:bottom-6 z-20 flex flex-wrap items-center gap-2.5 pointer-events-auto">
+                    <div className="absolute bottom-3 left-8 right-3 sm:left-20 md:left-28 sm:right-auto sm:bottom-6 z-20 flex flex-wrap items-center gap-2 pointer-events-auto">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleCtaClick(currentSlide);
                         }}
-                        className="px-5 sm:px-7 py-2.5 sm:py-3 bg-white text-black hover:bg-[#C5A059] transition-all duration-300 text-xs sm:text-sm font-bold tracking-[0.2em] uppercase flex items-center gap-2 shadow-2xl cursor-pointer group"
+                        className="px-3.5 py-1.5 sm:px-7 sm:py-3 bg-white text-black hover:bg-[#C5A059] transition-all duration-300 text-[10px] sm:text-sm font-bold tracking-[0.15em] sm:tracking-[0.2em] uppercase flex items-center gap-1.5 shadow-2xl cursor-pointer group"
                       >
                         <span>{currentSlide.ctaText}</span>
-                        <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+                        <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 transform group-hover:translate-x-1 transition-transform" />
                       </button>
 
                       {currentSlide.priceText && (
-                        <span className="px-3.5 py-2 rounded-none bg-black/85 border border-[#C5A059]/60 text-[#C5A059] font-bold text-xs sm:text-sm shadow-xl backdrop-blur-md">
+                        <span className="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-none bg-black/85 border border-[#C5A059]/60 text-[#C5A059] font-bold text-[10px] sm:text-xs shadow-xl backdrop-blur-md">
                           {currentSlide.priceText}
                         </span>
                       )}
