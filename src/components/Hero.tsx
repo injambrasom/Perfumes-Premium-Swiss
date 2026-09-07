@@ -68,7 +68,7 @@ export const Hero: React.FC<HeroProps> = ({
       highlightText: 'R$ 89,90',
       subtitle: 'Escolha 3 frascos de 15ml com 36% de concentração e leve sua assinatura para onde quiser.',
       tagline: 'Apenas R$ 29,96 por unidade',
-      priceText: '3x 15ml',
+      priceText: 'De R$ 135,00 por R$ 89,90 (3x 15ml)',
       imageUrl: 'https://i.postimg.cc/prj0ymzT/Trio-de-Bolso.jpg',
       ctaText: 'MONTAR MEU TRIO DE BOLSO',
       ctaType: 'trio',
@@ -83,7 +83,7 @@ export const Hero: React.FC<HeroProps> = ({
       subtitle: 'Uma obra-prima mineral e ambarada com açafrão dourado e âmbar cinzento radiante.',
       tagline: '36% de Essência Pura • Extrait de Parfum',
       priceText: 'R$ 130,00',
-      imageUrl: 'https://i.postimg.cc/pd74Tb46/Banner-Baccarat.png',
+      imageUrl: 'https://i.postimg.cc/BvnZXBCw/Banner-Baccarat.jpg',
       ctaText: 'VER BACCARAT EM DETALHES',
       ctaType: 'product',
       productId: baccarat?.id || 'swiss-03-baccarat',
@@ -113,7 +113,7 @@ export const Hero: React.FC<HeroProps> = ({
       subtitle: 'Jasmin Sambac da Índia radiante enriquecido por madeira de cashmeran e âmbar branco.',
       tagline: 'Fragrância marcante e inesquecível',
       priceText: 'R$ 130,00',
-      imageUrl: 'https://i.postimg.cc/0N3FQRFH/Banner-Aliem.png',
+      imageUrl: 'https://i.postimg.cc/Gpm3Hxj5/Banner-Aliem.jpg',
       ctaText: 'COMPRAR ALIEM',
       ctaType: 'product',
       productId: aliem?.id || 'swiss-13-aliem',
@@ -205,181 +205,224 @@ export const Hero: React.FC<HeroProps> = ({
 
   return (
     <section 
-      className="relative min-h-[85vh] lg:min-h-[92vh] flex items-center justify-center bg-[#0B0B0B] text-white overflow-hidden py-12 lg:py-16 pt-20 lg:pt-24 select-none"
+      className="relative min-h-[80vh] lg:min-h-[88vh] flex items-center justify-center bg-[#0B0B0B] text-white overflow-hidden pt-16 sm:pt-20 pb-4 select-none"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Central Background Video Overlay */}
-      <div className="absolute inset-0 z-0 overflow-hidden">
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          poster={heroImg}
-          className="w-full h-full object-cover object-center opacity-35 scale-105 transform transition-transform duration-[10000ms]"
-        >
-          <source
-            src="https://assets.mixkit.co/videos/3141/3141-720.mp4"
-            type="video/mp4"
-          />
-          <img 
-            src={heroImg}
-            alt="Perfumes Premium Swiss"
-            className="w-full h-full object-cover object-center"
-          />
-        </video>
-        {/* Soft dark vignettes across center stage */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0B] via-[#0B0B0B]/40 to-[#0B0B0B]/80" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0B0B0B] via-[#0B0B0B]/20 to-[#0B0B0B]" />
-      </div>
-
-      {/* LEFT SIDE MODEL - Seamlessly Integrated into the Background */}
-      <motion.div 
-        initial={{ opacity: 0, x: -50 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 1.2, delay: 0.2 }}
-        className="absolute left-0 top-0 bottom-0 w-1/2 lg:w-[30%] z-1 pointer-events-none select-none overflow-hidden"
-      >
-        <div className="relative w-full h-full opacity-35 lg:opacity-100">
-          <img 
-            src={maleModelGeneric} 
-            alt="Modelo Masculino High Fashion Swiss Atelier" 
-            className="w-full h-full object-cover object-top opacity-90 lg:hover:opacity-100 transition-opacity duration-700"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#0B0B0B]/30 lg:via-[#0B0B0B]/20 to-[#0B0B0B]" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0B] via-transparent to-[#0B0B0B]/70" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B0B]/80 via-transparent to-[#0B0B0B]" />
+      {/* Central Background Video Overlay (Only shown on non-image slides) */}
+      {!currentSlide.imageUrl && (
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            poster={heroImg}
+            className="w-full h-full object-cover object-center opacity-35 scale-105 transform transition-transform duration-[10000ms]"
+          >
+            <source
+              src="https://assets.mixkit.co/videos/3141/3141-720.mp4"
+              type="video/mp4"
+            />
+            <img 
+              src={heroImg}
+              alt="Perfumes Premium Swiss"
+              className="w-full h-full object-cover object-center"
+            />
+          </video>
+          {/* Soft dark vignettes across center stage */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0B] via-[#0B0B0B]/40 to-[#0B0B0B]/80" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0B0B0B] via-[#0B0B0B]/20 to-[#0B0B0B]" />
         </div>
-      </motion.div>
+      )}
 
-      {/* RIGHT SIDE MODEL - Seamlessly Integrated into the Background */}
-      <motion.div 
-        initial={{ opacity: 0, x: 50 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 1.2, delay: 0.2 }}
-        className="absolute right-0 top-0 bottom-0 w-1/2 lg:w-[30%] z-1 pointer-events-none select-none overflow-hidden"
-      >
-        <div className="relative w-full h-full opacity-35 lg:opacity-100">
-          <img 
-            src={femaleModelGeneric} 
-            alt="Modelo Feminino High Fashion Swiss Atelier" 
-            className="w-full h-full object-cover object-top opacity-90 lg:hover:opacity-100 transition-opacity duration-700"
-          />
-          <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#0B0B0B]/30 lg:via-[#0B0B0B]/20 to-[#0B0B0B]" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0B] via-transparent to-[#0B0B0B]/70" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B0B]/80 via-transparent to-[#0B0B0B]" />
-        </div>
-      </motion.div>
+      {/* LEFT & RIGHT SIDE MODELS - Only on Main Hero & 5% OFF Pix Slides */}
+      {!currentSlide.imageUrl && (
+        <>
+          {/* LEFT SIDE MODEL */}
+          <motion.div 
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 1.2, delay: 0.2 }}
+            className="absolute left-0 top-0 bottom-0 w-1/2 lg:w-[30%] z-1 pointer-events-none select-none overflow-hidden"
+          >
+            <div className="relative w-full h-full opacity-35 lg:opacity-100">
+              <img 
+                src={maleModelGeneric} 
+                alt="Modelo Masculino High Fashion Swiss Atelier" 
+                className="w-full h-full object-cover object-top opacity-90 lg:hover:opacity-100 transition-opacity duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#0B0B0B]/30 lg:via-[#0B0B0B]/20 to-[#0B0B0B]" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0B] via-transparent to-[#0B0B0B]/70" />
+              <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B0B]/80 via-transparent to-[#0B0B0B]" />
+            </div>
+          </motion.div>
 
-      {/* CENTER CONTENT CAROUSEL STAGE */}
-      <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 text-center pt-6 lg:pt-2 w-full min-h-[460px] sm:min-h-[520px] flex flex-col justify-between">
+          {/* RIGHT SIDE MODEL */}
+          <motion.div 
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 1.2, delay: 0.2 }}
+            className="absolute right-0 top-0 bottom-0 w-1/2 lg:w-[30%] z-1 pointer-events-none select-none overflow-hidden"
+          >
+            <div className="relative w-full h-full opacity-35 lg:opacity-100">
+              <img 
+                src={femaleModelGeneric} 
+                alt="Modelo Feminino High Fashion Swiss Atelier" 
+                className="w-full h-full object-cover object-top opacity-90 lg:hover:opacity-100 transition-opacity duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#0B0B0B]/30 lg:via-[#0B0B0B]/20 to-[#0B0B0B]" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0B] via-transparent to-[#0B0B0B]/70" />
+              <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B0B]/80 via-transparent to-[#0B0B0B]" />
+            </div>
+          </motion.div>
+        </>
+      )}
 
-        {/* Carousel Slide Wrapper */}
-        <div className="my-auto w-full relative">
-          {/* Side Floating Navigation Arrows (Desktop & Tablet) */}
+      {/* CAROUSEL CONTAINER */}
+      <div className="relative z-10 w-full min-h-[80vh] lg:min-h-[88vh] flex flex-col justify-between">
+
+        {/* Slide Content Area */}
+        <div className="w-full flex-1 flex items-center justify-center relative">
+          
+          {/* Side Floating Navigation Arrows */}
           <button
             onClick={handlePrev}
             aria-label="Banner anterior"
-            className="absolute -left-3 sm:-left-5 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
+            className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
           >
-            <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 transform group-hover:-translate-x-0.5 transition-transform" />
+            <ChevronLeft className="w-6 h-6 sm:w-7 sm:h-7 transform group-hover:-translate-x-0.5 transition-transform" />
           </button>
 
           <button
             onClick={handleNext}
             aria-label="Próximo banner"
-            className="absolute -right-3 sm:-right-5 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
+            className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
           >
-            <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 transform group-hover:translate-x-0.5 transition-transform" />
+            <ChevronRight className="w-6 h-6 sm:w-7 sm:h-7 transform group-hover:translate-x-0.5 transition-transform" />
           </button>
 
           <AnimatePresence mode="wait">
             {currentSlide.imageUrl ? (
-              /* FULL SIZE E-COMMERCE WEBSITE BANNER */
+              /* FULL EDGE-TO-EDGE UNCROPPED WEBSITE BANNER */
               <motion.div
                 key={currentSlide.id}
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                transition={{ duration: 0.45, ease: 'easeOut' }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.4 }}
                 onClick={() => handleCtaClick(currentSlide)}
-                className="relative w-full h-[300px] xs:h-[350px] sm:h-[420px] md:h-[480px] lg:h-[520px] rounded-2xl overflow-hidden border border-[#C5A059]/50 bg-black shadow-[0_25px_60px_rgba(0,0,0,0.95)] cursor-pointer group"
+                className="w-full max-w-[1500px] mx-auto relative overflow-hidden cursor-pointer group flex items-center justify-center bg-[#0B0B0B] min-h-[360px] sm:min-h-[480px] md:min-h-[560px]"
               >
-                {/* Full-width Banner Image */}
+                {/* Full Width Banner Graphic Image - 100% Uncropped */}
                 <img
                   src={currentSlide.imageUrl}
                   alt={currentSlide.title}
-                  className="w-full h-full object-cover object-center group-hover:scale-[1.02] transition-transform duration-700"
+                  className="w-full max-h-[75vh] sm:max-h-[82vh] h-auto object-contain object-center transition-transform duration-700 group-hover:scale-[1.005]"
                 />
 
-                {/* Luxury Gradient Overlay to ensure text readability on any banner */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent sm:bg-gradient-to-r sm:from-black/90 sm:via-black/50 sm:to-transparent flex flex-col justify-end sm:justify-center p-4 sm:p-8 md:p-12 text-left pointer-events-none">
-                  <div className="max-w-xl pointer-events-auto space-y-2 sm:space-y-3">
-                    {/* Badge */}
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[#C5A059]/60 bg-black/80 backdrop-blur-md shadow-lg">
-                      {renderBadgeIcon(currentSlide.badgeIcon)}
-                      <span className="text-[10px] sm:text-[11px] font-sans tracking-[0.2em] uppercase text-neutral-200 font-medium">
-                        {currentSlide.badge}
+                {/* SPECIAL HIGH-IMPACT TYPOGRAPHY OVERLAY FOR TRIO DE BOLSO BANNER - FULLY INSIDE BANNER FRAME */}
+                {currentSlide.id === 'trio' ? (
+                  <div className="absolute inset-0 z-20 flex flex-col justify-center items-start pl-12 sm:pl-20 md:pl-28 lg:pl-32 pr-6 py-6 sm:py-8 pointer-events-none">
+                    {/* Main High-Impact Typography (Directly on Image, Single Contained Column) */}
+                    <div className="max-w-md sm:max-w-lg text-left pointer-events-auto space-y-2 sm:space-y-3 my-auto">
+                      {/* Eyebrow & Badge */}
+                      <div className="inline-flex items-center gap-2 text-[#C5A059] font-bold text-xs sm:text-sm drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
+                        <Gift className="w-4 h-4 text-[#C5A059]" />
+                        <span className="uppercase tracking-[0.2em] font-sans text-white text-[11px] sm:text-xs">
+                          OFERTA IMPERDÍVEL • SWISS ATELIER
+                        </span>
+                      </div>
+
+                      <span className="text-[10px] sm:text-xs font-sans tracking-[0.25em] uppercase text-[#C5A059] font-bold block drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
+                        MONTE SEU CONJUNTO PERSONALIZADO
                       </span>
+
+                      {/* Title with Custom Fonts */}
+                      <h2 className="font-serif text-2xl sm:text-4xl md:text-5xl font-normal text-white leading-[1.1] drop-shadow-[0_4px_20px_rgba(0,0,0,0.95)]">
+                        3 PERFUMES DE BOLSO <br />
+                        <span className="text-[#C5A059] italic font-serif text-3xl sm:text-5xl md:text-6xl font-normal drop-shadow-[0_4px_25px_rgba(0,0,0,1)]">
+                          POR R$ 89,90
+                        </span>
+                      </h2>
+
+                      {/* Promotional Sub-inscriptions */}
+                      <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                        <span className="text-[#C5A059] font-extrabold text-xs sm:text-sm tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
+                          DE R$ 135,00 POR R$ 89,90
+                        </span>
+                        <span className="text-emerald-400 font-bold text-xs sm:text-sm drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
+                          • R$ 29,96 POR UNIDADE
+                        </span>
+                      </div>
+
+                      {/* Description Tagline */}
+                      <p className="text-xs sm:text-sm text-neutral-100 leading-relaxed font-sans font-normal max-w-xs sm:max-w-md drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
+                        Escolha 3 frascos de 15ml com <strong className="text-white font-semibold">36% de Concentração Pura</strong> e leve sua assinatura olfativa onde for.
+                      </p>
+
+                      {/* Main Action Button */}
+                      <div className="pt-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCtaClick(currentSlide);
+                          }}
+                          className="px-6 sm:px-8 py-3 bg-[#C5A059] hover:bg-white text-black transition-all duration-300 text-xs sm:text-sm font-extrabold tracking-[0.2em] uppercase flex items-center gap-2.5 shadow-[0_10px_25px_rgba(0,0,0,0.8)] cursor-pointer group rounded-none"
+                        >
+                          <span>MONTAR MEU TRIO DE BOLSO</span>
+                          <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1.5 transition-transform" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* DEFAULT OVERLAY FOR PRODUCT BANNERS (BACCARAT, SALVAGE, ALIEM) */
+                  <>
+                    {/* Top Promo Badge Overlay */}
+                    <div className="absolute top-3 left-12 sm:top-5 sm:left-20 md:left-28 z-20 pointer-events-auto flex flex-col items-start gap-1">
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/90 border border-[#C5A059]/70 text-[#C5A059] font-bold text-[11px] sm:text-xs shadow-2xl backdrop-blur-md">
+                        {renderBadgeIcon(currentSlide.badgeIcon)}
+                        <span className="uppercase tracking-wider text-white">
+                          {currentSlide.badge}
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Title */}
-                    <h2 className="font-serif text-xl sm:text-3xl md:text-4xl lg:text-5xl font-normal tracking-wide text-white leading-tight drop-shadow-[0_4px_20px_rgba(0,0,0,0.95)]">
-                      {currentSlide.title}{' '}
-                      {currentSlide.highlightText && (
-                        <span className="text-[#C5A059] italic font-serif">
-                          {currentSlide.highlightText}
-                        </span>
-                      )}
-                    </h2>
-
-                    {/* Subtitle & Tagline */}
-                    <p className="text-xs sm:text-sm md:text-base text-neutral-200 font-light leading-relaxed drop-shadow-md max-w-lg line-clamp-2 sm:line-clamp-none">
-                      {currentSlide.subtitle}
-                    </p>
-
-                    {currentSlide.tagline && (
-                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-[11px] sm:text-xs font-medium tracking-wide text-neutral-200 backdrop-blur-sm">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
-                        <span>{currentSlide.tagline}</span>
-                      </div>
-                    )}
-
-                    {/* Buttons & Price Tag */}
-                    <div className="pt-2 flex flex-wrap items-center gap-3">
+                    {/* Floating Interactive CTA Button */}
+                    <div className="absolute bottom-4 left-12 right-4 sm:left-20 md:left-28 sm:right-auto sm:bottom-6 z-20 flex flex-wrap items-center gap-2.5 pointer-events-auto">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleCtaClick(currentSlide);
                         }}
-                        className="px-6 sm:px-8 py-3 bg-white text-black hover:bg-[#C5A059] transition-all duration-300 rounded-none text-xs sm:text-sm font-bold tracking-[0.2em] uppercase flex items-center gap-2.5 shadow-2xl cursor-pointer group"
+                        className="px-5 sm:px-7 py-2.5 sm:py-3 bg-white text-black hover:bg-[#C5A059] transition-all duration-300 text-xs sm:text-sm font-bold tracking-[0.2em] uppercase flex items-center gap-2 shadow-2xl cursor-pointer group"
                       >
                         <span>{currentSlide.ctaText}</span>
                         <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
                       </button>
 
                       {currentSlide.priceText && (
-                        <span className="px-4 py-2 rounded-full bg-black/80 border border-[#C5A059]/60 text-[#C5A059] font-bold text-xs sm:text-sm shadow-xl backdrop-blur-md">
+                        <span className="px-3.5 py-2 rounded-none bg-black/85 border border-[#C5A059]/60 text-[#C5A059] font-bold text-xs sm:text-sm shadow-xl backdrop-blur-md">
                           {currentSlide.priceText}
                         </span>
                       )}
                     </div>
-                  </div>
-                </div>
+                  </>
+                )}
               </motion.div>
             ) : (
-              /* BRAND EDITORIAL HERO (SLIDE 1 / PROMO) */
+              /* BRAND EDITORIAL HERO (MAIN HERO & 5% OFF PIX) */
               <motion.div
                 key={currentSlide.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.5, ease: 'easeOut' }}
-                className="space-y-5 max-w-4xl mx-auto py-4 sm:py-8"
+                className="space-y-5 max-w-4xl mx-auto px-4 text-center py-12 sm:py-16"
               >
                 {/* Subtle Luxury Badge */}
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[#C5A059]/40 bg-black/70 backdrop-blur-md">
