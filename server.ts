@@ -88,17 +88,12 @@ app.get('/mercadopago/public-key', (req, res) => {
   res.json({ publicKey });
 });
 
-// Health Check Endpoint
+// Health Check Endpoint for deployment validation
 app.get('/api/health', (req, res) => {
-  const token = process.env.MERCADO_PAGO_ACCESS_TOKEN || DEFAULT_MP_ACCESS_TOKEN;
-  const hasToken = Boolean(token);
-  const hasPublicKey = Boolean(process.env.VITE_MERCADO_PAGO_PUBLIC_KEY);
-  res.json({
-    status: 'ok',
-    mercadoPagoConfigured: hasToken,
-    hasPublicKey,
-    connectedStockAppId: '79c8f0b3-973d-460a-a7bd-65f19a2fa2e1'
-  });
+  res.json({ ok: true });
+});
+app.get('/health', (req, res) => {
+  res.json({ ok: true });
 });
 
 // ==========================================
