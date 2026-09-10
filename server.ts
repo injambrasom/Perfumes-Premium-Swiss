@@ -1,16 +1,30 @@
 import express from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { createServer as createViteServer } from 'vite';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import { MercadoPagoConfig, Payment, Preference } from 'mercadopago';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, doc, setDoc } from 'firebase/firestore';
 import { PRODUCTS, REFERENCE_PERFUMES_LIST } from './src/data/products';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.resolve();
+
+// Initialize Firestore for server-side order updates in Webhook
+let firestoreDb: any = null;
+try {
+  const configPath = path.join(__dirname, 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    const firebaseApp = initializeApp(firebaseConfig);
+    firestoreDb = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
+    console.log('[FIREBASE SERVER] Firestore connected successfully for webhooks');
+  }
+} catch (err) {
+  console.warn('[FIREBASE SERVER] Firestore initialization warning:', err);
+}
 
 const app = express();
 const PORT = 3000;
@@ -22,11 +36,11 @@ app.use(express.text({ type: '*/*', limit: '10mb' }));
 
 // Default Mercado Pago Access Token provided by store owner
 const DEFAULT_MP_ACCESS_TOKEN = 'APP_USR-7347922819217970-010521-4f7235fc4e8db7b024a5da19c892f407-180258706';
-const DEFAULT_MP_PUBLIC_KEY = process.env.VITE_MERCADO_PAGO_PUBLIC_KEY || 'APP_USR-7365e556-6445-41c0-b5a0-107fad46bd5c';
+const DEFAULT_MP_PUBLIC_KEY = process.env.VITE_MERCADO_PAGO_PUBLIC_KEY || process.env.MP_PUBLIC_KEY || 'APP_USR-7365e556-6445-41c0-b5a0-107fad46bd5c';
 
 // Helper to get Mercado Pago client safely
 function getMercadoPagoClient() {
-  const token = process.env.MERCADO_PAGO_ACCESS_TOKEN || DEFAULT_MP_ACCESS_TOKEN;
+  const token = process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || DEFAULT_MP_ACCESS_TOKEN;
   if (!token) {
     return null;
   }
@@ -691,11 +705,12 @@ app.get('/mercadopago/payment-status/:id', handlePaymentStatus);
 // 3. Create Preference (Checkout Pro / Mercado Pago)
 const handleCreatePreference = async (req: express.Request, res: express.Response) => {
   try {
+    const token = process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || DEFAULT_MP_ACCESS_TOKEN;
     const client = getMercadoPagoClient();
-    if (!client) {
+    if (!client || !token) {
       return res.status(400).json({
         error: 'MERCADO_PAGO_NOT_CONFIGURED',
-        message: 'A chave MERCADO_PAGO_ACCESS_TOKEN não está configurada.'
+        message: 'A chave MP_ACCESS_TOKEN / MERCADO_PAGO_ACCESS_TOKEN não está configurada.'
       });
     }
 
@@ -736,11 +751,12 @@ const handleCreatePreference = async (req: express.Request, res: express.Respons
     const streetNum = isNaN(rawNumber) || rawNumber <= 0 ? 100 : rawNumber;
     const cleanCep = (payer?.cep || '').replace(/\D/g, '');
 
-    const origin = req.headers.origin || 'https://premium-swiss.vercel.app';
+    // Determine site origin dynamically
+    const reqOrigin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
+    const origin = reqOrigin || process.env.SITE_URL || 'https://perfumes-premium-swiss.vercel.app';
+    const cleanOrigin = origin.replace(/\/$/, '');
 
     const preference = new Preference(client);
-
-    const chosenInstallments = Math.min(12, Math.max(1, Number(payer?.installments || 2)));
 
     const preferencePayload: any = {
       items: mpItems,
@@ -760,15 +776,15 @@ const handleCreatePreference = async (req: express.Request, res: express.Respons
         }
       },
       payment_methods: {
-        installments: 12,
-        default_installments: chosenInstallments
+        installments: 12
       },
       back_urls: {
-        success: `${origin}/?status=approved&orderId=${orderId}`,
-        pending: `${origin}/?status=pending&orderId=${orderId}`,
-        failure: `${origin}/?status=failure&orderId=${orderId}`
+        success: `${cleanOrigin}/?status=approved&orderId=${orderId}`,
+        pending: `${cleanOrigin}/?status=pending&orderId=${orderId}`,
+        failure: `${cleanOrigin}/?status=failure&orderId=${orderId}`
       },
-      auto_return: 'approved'
+      auto_return: 'approved',
+      notification_url: `${cleanOrigin}/api/mercadopago/webhook`
     };
 
     if (cleanCpf && (cleanCpf.length === 11 || cleanCpf.length === 14)) {
@@ -785,13 +801,11 @@ const handleCreatePreference = async (req: express.Request, res: express.Respons
       };
     }
 
-    console.log('Creating Mercado Pago preference with payload:', JSON.stringify(preferencePayload));
+    console.log('[MERCADO PAGO] Creating preference payload:', JSON.stringify(preferencePayload));
 
-    const result = await preference.create({
-      body: preferencePayload
-    });
+    const result = await preference.create({ body: preferencePayload });
 
-    console.log('Mercado Pago preference created successfully:', result.id, result.init_point);
+    console.log('[MERCADO PAGO] Preference created successfully:', result.id, result.init_point);
 
     res.json({
       success: true,
@@ -800,7 +814,7 @@ const handleCreatePreference = async (req: express.Request, res: express.Respons
       sandbox_init_point: result.sandbox_init_point
     });
   } catch (error: any) {
-    console.error('Erro ao criar preferência no Mercado Pago:', error?.message || error, error);
+    console.error('[MERCADO PAGO] Erro ao criar preferência:', error?.message || error, error);
     res.status(500).json({
       error: 'PREFERENCE_CREATION_FAILED',
       message: error?.message || 'Falha ao criar preferência de checkout.',
@@ -812,264 +826,90 @@ const handleCreatePreference = async (req: express.Request, res: express.Respons
 app.post('/api/mercadopago/create-preference', handleCreatePreference);
 app.post('/mercadopago/create-preference', handleCreatePreference);
 
-// 4. Process Credit Card directly (Checkout Transparente)
-const handleProcessCard = async (req: express.Request, res: express.Response) => {
+// 4. Webhook / IPN Notification Handler
+const handleWebhook = async (req: express.Request, res: express.Response) => {
   try {
-    const client = getMercadoPagoClient();
-    const token = process.env.MERCADO_PAGO_ACCESS_TOKEN || DEFAULT_MP_ACCESS_TOKEN;
-    if (!client || !token) {
-      return res.status(400).json({
-        error: 'MERCADO_PAGO_NOT_CONFIGURED',
-        message: 'A chave MERCADO_PAGO_ACCESS_TOKEN não está configurada.'
-      });
+    const token = process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || DEFAULT_MP_ACCESS_TOKEN;
+    const paymentId = req.query['data.id'] || req.query.id || req.body?.data?.id || req.body?.id;
+    const topic = req.query.topic || req.query.type || req.body?.type || req.body?.topic;
+
+    console.log('[WEBHOOK MP] Received notification:', { query: req.query, body: req.body, paymentId, topic });
+
+    // Respond HTTP 200 immediately if probe / missing ID
+    if (!paymentId) {
+      return res.status(200).json({ status: 'ok', message: 'Webhook probe received' });
     }
 
-    const {
-      card,
-      token: clientToken,
-      deviceId,
-      payment_method_id: clientPaymentMethodId,
-      issuer_id: clientIssuerId,
-      transaction_amount,
-      installments,
-      description,
-      payer,
-      orderId
-    } = req.body || {};
+    // Consult payment details directly from Mercado Pago API
+    const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
 
-    let cardTokenId = clientToken;
-    let paymentMethodId = clientPaymentMethodId || 'master';
-    let issuerId = clientIssuerId ? String(clientIssuerId) : undefined;
+    if (!mpRes.ok) {
+      console.warn(`[WEBHOOK MP] Could not fetch payment ${paymentId}: HTTP ${mpRes.status}`);
+      return res.status(200).json({ status: 'ok', message: 'Payment fetch failed' });
+    }
 
-    const cleanCpf = String(payer?.cpf || card?.doc_number || '').replace(/\D/g, '');
+    const paymentData = await mpRes.json();
+    const status = paymentData.status;
+    const orderId = paymentData.external_reference;
 
-    // If card token was not created on client, generate it here
-    if (!cardTokenId) {
-      if (!card || !card.number || !card.cvv || !card.expiration_month || !card.expiration_year) {
-        return res.status(400).json({
-          error: 'INVALID_CARD_DATA',
-          message: 'Preencha todos os dados do cartão (número, validade e CVV).'
-        });
+    console.log(`[WEBHOOK MP] Payment ${paymentId} for Order ${orderId}: status=${status}, detail=${paymentData.status_detail}`);
+
+    if (orderId && firestoreDb) {
+      let mappedStatus: 'pago' | 'pendente' | 'cancelado' = 'pendente';
+      if (status === 'approved') {
+        mappedStatus = 'pago';
+      } else if (status === 'pending' || status === 'in_process') {
+        mappedStatus = 'pendente';
+      } else if (status === 'rejected' || status === 'cancelled' || status === 'refunded') {
+        mappedStatus = 'cancelado';
       }
 
-      const cleanCard = String(card.number).replace(/\D/g, '');
-      const cleanCvv = String(card.cvv).trim();
-      const expMonth = parseInt(String(card.expiration_month), 10);
-      let expYear = parseInt(String(card.expiration_year), 10);
-      if (expYear < 100) expYear += 2000;
-
-      // Detect card brand and issuer accurately via Mercado Pago BIN search API
-      const bin = cleanCard.slice(0, 6);
       try {
-        const binRes = await fetch(`https://api.mercadopago.com/v1/payment_methods/search?public_key=${DEFAULT_MP_PUBLIC_KEY}&bin=${bin}`);
-        const binData = await binRes.json().catch(() => null);
-        if (binData && binData.results && binData.results.length > 0) {
-          const pm = binData.results.find((r: any) => r.payment_type_id === 'credit_card');
-          if (pm?.id) paymentMethodId = pm.id;
-          if (pm?.issuer?.id) issuerId = String(pm.issuer.id);
-        } else {
-          if (/^4/.test(cleanCard)) paymentMethodId = 'visa';
-          else if (/^(5[1-5]|222[1-9]|22[3-9]|2[3-6]|27[0-1]|2720)/.test(cleanCard)) paymentMethodId = 'master';
-          else if (/^(34|37)/.test(cleanCard)) paymentMethodId = 'amex';
-          else if (/^(4011|438935|451416|4576|504175|5067|5090|627780|636297|636368|6504|6505|6509|6516|6550|2818|509)/.test(cleanCard)) paymentMethodId = 'elo';
-          else if (/^(38|60)/.test(cleanCard)) paymentMethodId = 'hipercard';
-        }
-      } catch {
-        if (/^4/.test(cleanCard)) paymentMethodId = 'visa';
-        else if (/^(5[1-5]|222[1-9]|22[3-9]|2[3-6]|27[0-1]|2720)/.test(cleanCard)) paymentMethodId = 'master';
-        else if (/^(34|37)/.test(cleanCard)) paymentMethodId = 'amex';
-        else if (/^(4011|438935|451416|4576|504175|5067|5090|627780|636297|636368)/.test(cleanCard)) paymentMethodId = 'elo';
-        else if (/^(38|60)/.test(cleanCard)) paymentMethodId = 'hipercard';
+        const orderDocRef = doc(firestoreDb, 'orders', String(orderId));
+        await setDoc(orderDocRef, {
+          status: mappedStatus,
+          paymentId: String(paymentId),
+          paymentStatus: status,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+        console.log(`[WEBHOOK MP] Order ${orderId} updated to '${mappedStatus}' in Firestore`);
+      } catch (dbErr) {
+        console.error(`[WEBHOOK MP] Error updating Firestore for order ${orderId}:`, dbErr);
       }
-
-      // Step 1: Create Card Token via Mercado Pago REST API using Public Key
-      const tokenRes = await fetch(`https://api.mercadopago.com/v1/card_tokens?public_key=${DEFAULT_MP_PUBLIC_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          card_number: cleanCard,
-          expiration_month: expMonth,
-          expiration_year: expYear,
-          security_code: cleanCvv,
-          cardholder: {
-            name: (card.holder_name || payer?.name || 'CLIENTE').toUpperCase(),
-            identification: {
-              type: 'CPF',
-              number: cleanCpf || '00000000000'
-            }
-          }
-        })
-      });
-
-      const tokenData = await tokenRes.json().catch(() => null);
-
-      if (!tokenRes.ok || !tokenData || !tokenData.id) {
-        console.error('Erro ao gerar token do cartão no Mercado Pago:', tokenData);
-        let msg = 'Não foi possível validar o cartão de crédito.';
-        if (tokenData?.cause?.[0]?.description) {
-          msg = `Erro no cartão: ${tokenData.cause[0].description}`;
-        } else if (tokenData?.message) {
-          msg = tokenData.message;
-        }
-        return res.status(400).json({
-          error: 'CARD_TOKEN_FAILED',
-          message: msg
-        });
-      }
-
-      cardTokenId = tokenData.id;
     }
 
-    // Step 2: Create Payment using Mercado Pago Payment SDK
-    const payment = new Payment(client);
-    const cleanPhone = (payer?.phone || '').replace(/\D/g, '');
-    const areaCode = cleanPhone.length >= 10 ? cleanPhone.slice(0, 2) : '11';
-    const phoneNumber = cleanPhone.length >= 10 ? cleanPhone.slice(2) : (cleanPhone || '999999999');
-    const cleanCep = (payer?.cep || '').replace(/\D/g, '');
-    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
-
-    const paymentPayload: any = {
-      transaction_amount: Number(Number(transaction_amount).toFixed(2)),
-      token: cardTokenId,
-      description: description || 'Perfumes Premium Swiss - Pedido',
-      installments: Number(installments || 1),
-      payment_method_id: paymentMethodId,
-      statement_descriptor: 'SWISS PERFUMES',
-      external_reference: String(orderId || `SWISS-${Date.now()}`),
-      payer: {
-        email: payer?.email && payer.email.includes('@') ? payer.email : 'cliente@swiss.com',
-        first_name: payer?.name?.split(' ')[0] || 'Cliente',
-        last_name: payer?.name?.split(' ').slice(1).join(' ') || 'Swiss',
-        identification: {
-          type: 'CPF',
-          number: cleanCpf || '00000000000'
-        },
-        phone: {
-          area_code: areaCode,
-          number: phoneNumber
-        },
-        address: {
-          zip_code: cleanCep.length === 8 ? cleanCep : '01001000',
-          street_name: payer?.street || 'Rua',
-          street_number: String(payer?.number || '123')
-        }
-      },
-      additional_info: {
-        ip_address: clientIp,
-        items: [
-          {
-            id: String(orderId || 'swiss-1'),
-            title: description || 'Perfumes Premium Swiss - Pedido',
-            quantity: 1,
-            unit_price: Number(Number(transaction_amount).toFixed(2))
-          }
-        ],
-        payer: {
-          first_name: payer?.name?.split(' ')[0] || 'Cliente',
-          last_name: payer?.name?.split(' ').slice(1).join(' ') || 'Swiss',
-          phone: {
-            area_code: areaCode,
-            number: phoneNumber
-          },
-          address: {
-            zip_code: cleanCep.length === 8 ? cleanCep : '01001000',
-            street_name: payer?.street || 'Rua',
-            street_number: String(payer?.number || '123')
-          }
-        },
-        shipments: {
-          receiver_address: {
-            zip_code: cleanCep.length === 8 ? cleanCep : '01001000',
-            street_name: payer?.street || 'Rua',
-            street_number: String(payer?.number || '123'),
-            floor: payer?.complement || ''
-          }
-        }
-      }
-    };
-
-    if (issuerId) {
-      paymentPayload.issuer_id = issuerId;
-    }
-
-    console.log('Processing Direct Credit Card Payment:', paymentPayload.payment_method_id, 'installments:', paymentPayload.installments, 'amount:', paymentPayload.transaction_amount, 'issuer:', issuerId);
-
-    const requestHeaders: Record<string, string> = {
-      'X-Idempotency-Key': `pay-${orderId || Date.now()}-${Date.now()}`
-    };
-
-    const sessionDeviceId = deviceId || (req.headers['x-meli-session-id'] as string);
-    if (sessionDeviceId) {
-      requestHeaders['X-Meli-Session-Id'] = sessionDeviceId;
-    }
-
-    const paymentResult = await payment.create({
-      body: paymentPayload,
-      requestOptions: {
-        idempotencyKey: `pay-${orderId || Date.now()}-${Date.now()}`,
-        headers: requestHeaders
-      } as any
+    return res.status(200).json({
+      status: 'ok',
+      paymentId,
+      orderId,
+      paymentStatus: status
     });
-
-    console.log('Mercado Pago Card Payment Result:', paymentResult.id, paymentResult.status, paymentResult.status_detail);
-
-    if (paymentResult.status === 'approved') {
-      return res.json({
-        success: true,
-        status: 'approved',
-        id: paymentResult.id,
-        status_detail: paymentResult.status_detail,
-        message: 'Pagamento aprovado com sucesso!'
-      });
-    } else if (paymentResult.status === 'in_process') {
-      return res.json({
-        success: true,
-        status: 'in_process',
-        id: paymentResult.id,
-        status_detail: paymentResult.status_detail,
-        message: 'Pagamento em análise pela operadora do cartão.'
-      });
-    } else {
-      let errorMsg = 'Pagamento recusado pela operadora do cartão.';
-      const detail = paymentResult.status_detail;
-      if (detail === 'cc_rejected_insufficient_amount') {
-        errorMsg = 'Saldo ou limite insuficiente no cartão.';
-      } else if (detail === 'cc_rejected_bad_filled_security_code') {
-        errorMsg = 'Código de segurança (CVV) do cartão incorreto.';
-      } else if (detail === 'cc_rejected_bad_filled_date') {
-        errorMsg = 'Data de validade do cartão incorreta.';
-      } else if (detail === 'cc_rejected_bad_filled_other' || detail === 'cc_rejected_bad_filled_card_number') {
-        errorMsg = 'Número ou dados do cartão preenchidos incorretamente.';
-      } else if (detail === 'cc_rejected_high_risk') {
-        errorMsg = 'Recusado por validação de segurança do banco. Verifique os dados ou utilize outro cartão.';
-      } else if (detail === 'cc_rejected_call_for_authorize') {
-        errorMsg = 'Pagamento não autorizado pelo banco emissor. Por favor, autorize a compra no app do seu banco.';
-      }
-
-      return res.status(400).json({
-        error: 'PAYMENT_REJECTED',
-        status: paymentResult.status,
-        status_detail: paymentResult.status_detail,
-        message: errorMsg
-      });
-    }
   } catch (error: any) {
-    console.error('Erro ao processar cartão direto no Mercado Pago:', error);
-    return res.status(500).json({
-      error: 'CARD_PAYMENT_ERROR',
-      message: error?.message || 'Falha ao processar pagamento no cartão.'
-    });
+    console.error('[WEBHOOK MP] Error processing webhook:', error);
+    return res.status(200).json({ status: 'ok', error: error?.message });
   }
 };
 
-app.post('/api/mercadopago/process-card', handleProcessCard);
-app.post('/mercadopago/process-card', handleProcessCard);
+app.post('/api/mercadopago/webhook', handleWebhook);
+app.get('/api/mercadopago/webhook', handleWebhook);
+app.post('/mercadopago/webhook', handleWebhook);
+app.get('/mercadopago/webhook', handleWebhook);
+
+app.post('/api/mercadopago/ipn', handleWebhook);
+app.get('/api/mercadopago/ipn', handleWebhook);
+app.post('/mercadopago/ipn', handleWebhook);
+app.get('/mercadopago/ipn', handleWebhook);
 
 // ==========================================
 // VITE / STATIC SERVING SETUP
 // ==========================================
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
