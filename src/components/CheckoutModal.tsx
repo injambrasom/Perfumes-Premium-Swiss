@@ -643,7 +643,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           window.location.href = redirectUrl;
           return;
         } else {
-          setMpError(data?.message || 'Não foi possível gerar a preferência do Mercado Pago. Tente novamente ou pague via PIX.');
+          let errorMsg = data?.message || 'Não foi possível gerar a preferência do Mercado Pago. Tente novamente ou pague via PIX.';
+          if (data?.details) {
+            errorMsg += ` Detalhes: ${data.details}`;
+          }
+          setMpError(errorMsg);
           setStep('form');
         }
       } catch (err: any) {

@@ -26,6 +26,30 @@ try {
   console.warn('[FIREBASE SERVER] Firestore initialization warning:', err);
 }
 
+// Startup Credentials Validation for Mercado Pago
+function validateMercadoPagoCredentialsOnStartup() {
+  const activeToken = process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || DEFAULT_MP_ACCESS_TOKEN;
+  const isProductionEnv = process.env.NODE_ENV === 'production' || process.env.VERCEL;
+  
+  console.log('\n==================================================');
+  console.log('[MERCADO PAGO STARTUP] Validando credenciais do Mercado Pago...');
+  if (!activeToken) {
+    console.error('❌ [MERCADO PAGO STARTUP ERROR] Nenhuma chave MP_ACCESS_TOKEN ou MERCADO_PAGO_ACCESS_TOKEN foi configurada!');
+  } else if (activeToken.startsWith('TEST-')) {
+    console.error('⚠️ [MERCADO PAGO STARTUP WARNING/ERROR] A chave MP_ACCESS_TOKEN configurada é de TESTE (inicia com TEST-). Em ambiente de produção na Vercel, utilize a chave de PRODUÇÃO iniciando com APP_USR-!');
+    if (isProductionEnv) {
+      console.error('❌ [PROD ALERT] Mercado Pago operando em produção com credencial TEST-!');
+    }
+  } else if (activeToken.startsWith('APP_USR-')) {
+    console.log(`✅ [MERCADO PAGO STARTUP OK] Credencial de PRODUÇÃO detectada: ${activeToken.substring(0, 12)}...`);
+  } else {
+    console.warn(`⚠️ [MERCADO PAGO STARTUP WARNING] O formato da chave do Mercado Pago é atípico: ${activeToken.substring(0, 8)}...`);
+  }
+  console.log('==================================================\n');
+}
+
+validateMercadoPagoCredentialsOnStartup();
+
 const app = express();
 const PORT = 3000;
 
@@ -710,31 +734,39 @@ const handleCreatePreference = async (req: express.Request, res: express.Respons
     if (!client || !token) {
       return res.status(400).json({
         error: 'MERCADO_PAGO_NOT_CONFIGURED',
-        message: 'A chave MP_ACCESS_TOKEN / MERCADO_PAGO_ACCESS_TOKEN não está configurada.'
+        message: 'A chave MP_ACCESS_TOKEN não está configurada no servidor.',
+        details: 'Configure MP_ACCESS_TOKEN nas Variáveis de Ambiente na Vercel.'
       });
     }
 
     const { items, payer, orderId, shippingCost, total } = req.body;
 
+    // Validate and format items according to Mercado Pago SDK specification
     const mpItems = (items || []).map((item: any) => {
       const rawPrice = Number(item.price || item.selectedPrice || item.product?.price || 0);
       const validPrice = rawPrice > 0 ? Number(rawPrice.toFixed(2)) : 35.00;
+      const validQty = Math.max(1, Math.floor(Number(item.quantity || 1)));
+      const title = String(item.name || item.product?.name || 'Perfume').trim();
+      const size = String(item.size || item.selectedSize || '100ml').trim();
+      const fullTitle = `${title} (${size})`.substring(0, 256);
+      const refName = String(item.referenceName || item.product?.referenceName || 'Perfumes Premium Swiss').trim().substring(0, 256);
+
       return {
-        id: String(item.productId || item.product?.id || 'PERFUME-SWISS'),
-        title: `${item.name || item.product?.name || 'Perfume'} (${item.size || item.selectedSize || '100ml'})`.substring(0, 250),
-        description: String(item.referenceName || item.product?.referenceName || 'Perfumes Premium Swiss Atelier').substring(0, 250),
-        quantity: Math.max(1, Number(item.quantity || 1)),
+        id: String(item.productId || item.product?.id || 'PERFUME-SWISS').substring(0, 256),
+        title: fullTitle,
+        description: refName,
+        quantity: validQty,
         unit_price: validPrice,
         currency_id: 'BRL'
       };
     });
 
-    // If total provided and items are empty, create generic item
-    if (mpItems.length === 0 && total) {
+    // Fallback item if no items passed but total exists
+    if (mpItems.length === 0) {
       const calcTotal = Number(total) > 0 ? Number(Number(total).toFixed(2)) : 35.00;
       mpItems.push({
         id: 'PEDIDO-SWISS',
-        title: `Pedido Swiss Atelier #${orderId}`,
+        title: `Pedido Swiss Atelier #${orderId || Date.now()}`,
         description: 'Perfumes Premium Importados Swiss',
         quantity: 1,
         unit_price: calcTotal,
@@ -742,18 +774,25 @@ const handleCreatePreference = async (req: express.Request, res: express.Respons
       });
     }
 
-    const cleanCpf = (payer?.cpf || '').replace(/\D/g, '');
-    const cleanPhone = (payer?.phone || '').replace(/\D/g, '');
+    const cleanCpf = String(payer?.cpf || '').replace(/\D/g, '');
+    const cleanPhone = String(payer?.phone || '').replace(/\D/g, '');
     const areaCode = cleanPhone.length >= 10 ? cleanPhone.slice(0, 2) : '11';
     const phoneNumber = cleanPhone.length >= 10 ? cleanPhone.slice(2) : (cleanPhone.length > 0 ? cleanPhone : '999999999');
     
-    const rawNumber = parseInt((payer?.number || '').replace(/\D/g, ''), 10);
+    const rawNumber = parseInt(String(payer?.number || '').replace(/\D/g, ''), 10);
     const streetNum = isNaN(rawNumber) || rawNumber <= 0 ? 100 : rawNumber;
-    const cleanCep = (payer?.cep || '').replace(/\D/g, '');
+    const cleanCep = String(payer?.cep || '').replace(/\D/g, '');
 
-    // Determine site origin dynamically
-    const reqOrigin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
-    const origin = reqOrigin || process.env.SITE_URL || 'https://perfumes-premium-swiss.vercel.app';
+    // Determine site origin dynamically with https validation
+    let reqOrigin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
+    let origin = reqOrigin || process.env.SITE_URL || 'https://perfumes-premium-swiss.vercel.app';
+    if (!origin.startsWith('http://') && !origin.startsWith('https://')) {
+      origin = `https://${origin}`;
+    }
+    // Convert http to https if on vercel or production domain
+    if (!origin.includes('localhost') && !origin.includes('127.0.0.1') && origin.startsWith('http://')) {
+      origin = origin.replace('http://', 'https://');
+    }
     const cleanOrigin = origin.replace(/\/$/, '');
 
     const preference = new Preference(client);
@@ -762,16 +801,16 @@ const handleCreatePreference = async (req: express.Request, res: express.Respons
       items: mpItems,
       external_reference: String(orderId || `SWISS-${Date.now()}`),
       payer: {
-        name: payer?.name?.split(' ')[0] || 'Cliente',
-        surname: payer?.name?.split(' ').slice(1).join(' ') || 'Swiss',
-        email: payer?.email && payer.email.includes('@') ? payer.email : 'cliente@swiss.com',
+        name: String(payer?.name?.split(' ')[0] || 'Cliente').trim().substring(0, 50),
+        surname: String(payer?.name?.split(' ').slice(1).join(' ') || 'Swiss').trim().substring(0, 50),
+        email: payer?.email && payer.email.includes('@') ? payer.email.trim() : 'cliente@swiss.com',
         phone: {
-          area_code: areaCode,
-          number: phoneNumber
+          area_code: String(areaCode),
+          number: String(phoneNumber)
         },
         address: {
-          zip_code: cleanCep.length === 8 ? cleanCep : '01001000',
-          street_name: payer?.street || 'Rua',
+          zip_code: String(cleanCep.length === 8 ? cleanCep : '01001000'),
+          street_name: String(payer?.street || 'Rua').trim().substring(0, 250),
           street_number: streetNum
         }
       },
@@ -783,9 +822,13 @@ const handleCreatePreference = async (req: express.Request, res: express.Respons
         pending: `${cleanOrigin}/?status=pending&orderId=${orderId}`,
         failure: `${cleanOrigin}/?status=failure&orderId=${orderId}`
       },
-      auto_return: 'approved',
-      notification_url: `${cleanOrigin}/api/mercadopago/webhook`
+      auto_return: 'approved'
     };
+
+    // notification_url is ONLY added if cleanOrigin is a valid HTTPS public URL
+    if (cleanOrigin.startsWith('https://') && !cleanOrigin.includes('localhost') && !cleanOrigin.includes('127.0.0.1')) {
+      preferencePayload.notification_url = `${cleanOrigin}/api/mercadopago/webhook`;
+    }
 
     if (cleanCpf && (cleanCpf.length === 11 || cleanCpf.length === 14)) {
       preferencePayload.payer.identification = {
@@ -794,31 +837,71 @@ const handleCreatePreference = async (req: express.Request, res: express.Respons
       };
     }
 
-    if (Number(shippingCost) > 0) {
+    const validShipCost = Number(shippingCost);
+    if (!isNaN(validShipCost) && validShipCost > 0) {
       preferencePayload.shipments = {
-        cost: Number(shippingCost),
+        cost: Number(validShipCost.toFixed(2)),
         mode: 'not_specified'
       };
     }
 
-    console.log('[MERCADO PAGO] Creating preference payload:', JSON.stringify(preferencePayload));
+    console.log('[MERCADO PAGO] Payload enviado para preference.create:', JSON.stringify(preferencePayload, null, 2));
 
     const result = await preference.create({ body: preferencePayload });
 
-    console.log('[MERCADO PAGO] Preference created successfully:', result.id, result.init_point);
+    console.log('[MERCADO PAGO] Preferência criada com sucesso:', {
+      id: result.id,
+      init_point: result.init_point
+    });
 
-    res.json({
+    return res.json({
       success: true,
       preferenceId: result.id,
       init_point: result.init_point,
       sandbox_init_point: result.sandbox_init_point
     });
   } catch (error: any) {
-    console.error('[MERCADO PAGO] Erro ao criar preferência:', error?.message || error, error);
-    res.status(500).json({
+    const errorStatus = error?.status || error?.response?.status || error?.api_response?.status || 500;
+    const errorCause = error?.cause || error?.response?.data?.cause || error?.api_response?.body?.cause || error?.api_response?.data?.cause || [];
+    const errorBody = error?.response?.data || error?.api_response?.body || error?.api_response?.data || error?.body || {};
+    const errorMessage = error?.message || 'Falha ao criar preferência no Mercado Pago.';
+
+    console.error('❌ [MERCADO PAGO PREFERENCE ERROR FULL LOG]:', {
+      status: errorStatus,
+      message: errorMessage,
+      cause: errorCause,
+      body: errorBody,
+      rawError: error
+    });
+
+    let userFriendlyMessage = 'Não foi possível gerar a preferência do Mercado Pago.';
+    let detailMessage = '';
+
+    if (errorStatus === 401 || errorStatus === 403) {
+      userFriendlyMessage = 'Credenciais do Mercado Pago inválidas ou sem permissão.';
+      detailMessage = 'A chave MP_ACCESS_TOKEN configurada na Vercel está incorreta ou sem permissão. Verifique se copiou a credencial de Produção (APP_USR-...).';
+    } else if (errorStatus === 400) {
+      userFriendlyMessage = 'Dados inválidos enviados ao Mercado Pago.';
+      if (Array.isArray(errorCause) && errorCause.length > 0) {
+        detailMessage = errorCause.map((c: any) => c?.description || c?.message || JSON.stringify(c)).join('; ');
+      } else if (errorBody?.message) {
+        detailMessage = errorBody.message;
+      } else if (typeof errorBody === 'string') {
+        detailMessage = errorBody;
+      } else {
+        detailMessage = errorMessage;
+      }
+    } else {
+      detailMessage = errorMessage;
+    }
+
+    return res.status(errorStatus >= 400 && errorStatus < 600 ? errorStatus : 500).json({
       error: 'PREFERENCE_CREATION_FAILED',
-      message: error?.message || 'Falha ao criar preferência de checkout.',
-      details: error
+      status: errorStatus,
+      message: userFriendlyMessage,
+      details: detailMessage,
+      cause: errorCause,
+      body: errorBody
     });
   }
 };
