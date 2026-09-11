@@ -809,8 +809,8 @@ const handleCreatePreference = async (req: express.Request, res: express.Respons
       items: mpItems,
       external_reference: String(orderId || `SWISS-${Date.now()}`),
       payer: {
-        name: String(payer?.name?.split(' ')[0] || 'Cliente').trim().substring(0, 50),
-        surname: String(payer?.name?.split(' ').slice(1).join(' ') || 'Swiss').trim().substring(0, 50),
+        name: (String(payer?.name || '').trim().split(/\s+/)[0] || 'Cliente').substring(0, 50),
+        surname: (String(payer?.name || '').trim().split(/\s+/).slice(1).join(' ') || 'Swiss').substring(0, 50),
         email: payer?.email && payer.email.includes('@') ? payer.email.trim() : 'cliente@swiss.com',
         phone: {
           area_code: String(areaCode),

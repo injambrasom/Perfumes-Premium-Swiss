@@ -644,8 +644,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           return;
         } else {
           let errorMsg = data?.message || 'Não foi possível gerar a preferência do Mercado Pago. Tente novamente ou pague via PIX.';
-          if (data?.details) {
-            errorMsg += ` Detalhes: ${data.details}`;
+          if (data?.details && typeof data.details === 'string' && !errorMsg.includes(data.details)) {
+            errorMsg += ` (${data.details})`;
           }
           setMpError(errorMsg);
           setStep('form');
