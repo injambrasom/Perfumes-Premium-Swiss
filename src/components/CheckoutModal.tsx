@@ -114,7 +114,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [pixQrCodeString, setPixQrCodeString] = useState<string | null>(null);
   const [pixPaymentId, setPixPaymentId] = useState<string | number | null>(null);
   const [mpError, setMpError] = useState<string | null>(null);
-  const [mpPublicKey, setMpPublicKey] = useState<string>('APP_USR-7365e556-6445-41c0-b5a0-107fad46bd5c');
+  const [mpPublicKey, setMpPublicKey] = useState<string>(import.meta.env.VITE_MERCADO_PAGO_PUBLIC_KEY || '');
 
   // Snapshot of submitted order to prevent items being wiped out by onClearCart
   const [submittedOrderInfo, setSubmittedOrderInfo] = useState<{

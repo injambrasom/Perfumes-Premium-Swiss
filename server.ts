@@ -26,45 +26,53 @@ try {
   console.warn('[FIREBASE SERVER] Firestore initialization warning:', err);
 }
 
+// ==========================================
+// MERCADO PAGO ENVIRONMENT VARIABLES
+// ==========================================
+const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || '';
+const MP_PUBLIC_KEY = process.env.MP_PUBLIC_KEY || process.env.VITE_MERCADO_PAGO_PUBLIC_KEY || '';
+
 // Startup Credentials Validation for Mercado Pago
 function validateMercadoPagoCredentialsOnStartup() {
-  const activeToken = process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || DEFAULT_MP_ACCESS_TOKEN;
   const isProductionEnv = process.env.NODE_ENV === 'production' || process.env.VERCEL;
   
   console.log('\n==================================================');
   console.log('[MERCADO PAGO STARTUP] Validando credenciais do Mercado Pago...');
-  if (!activeToken) {
+  if (!MP_ACCESS_TOKEN) {
     console.error('❌ [MERCADO PAGO STARTUP ERROR] Nenhuma chave MP_ACCESS_TOKEN ou MERCADO_PAGO_ACCESS_TOKEN foi configurada!');
-  } else if (activeToken.startsWith('TEST-')) {
+  } else if (MP_ACCESS_TOKEN.startsWith('TEST-')) {
     console.error('⚠️ [MERCADO PAGO STARTUP WARNING/ERROR] A chave MP_ACCESS_TOKEN configurada é de TESTE (inicia com TEST-). Em ambiente de produção na Vercel, utilize a chave de PRODUÇÃO iniciando com APP_USR-!');
     if (isProductionEnv) {
       console.error('❌ [PROD ALERT] Mercado Pago operando em produção com credencial TEST-!');
     }
-  } else if (activeToken.startsWith('APP_USR-')) {
-    console.log(`✅ [MERCADO PAGO STARTUP OK] Credencial de PRODUÇÃO detectada: ${activeToken.substring(0, 12)}...`);
+  } else if (MP_ACCESS_TOKEN.startsWith('APP_USR-')) {
+    console.log('✅ [MERCADO PAGO STARTUP OK] Credencial de PRODUÇÃO (APP_USR-...) configurada e validada.');
   } else {
-    console.warn(`⚠️ [MERCADO PAGO STARTUP WARNING] O formato da chave do Mercado Pago é atípico: ${activeToken.substring(0, 8)}...`);
+    console.warn('⚠️ [MERCADO PAGO STARTUP WARNING] O formato da chave do Mercado Pago é atípico (esperado APP_USR-... ou TEST-...).');
+  }
+
+  if (!MP_PUBLIC_KEY) {
+    console.warn('⚠️ [MERCADO PAGO STARTUP WARNING] Chave pública MP_PUBLIC_KEY ou VITE_MERCADO_PAGO_PUBLIC_KEY não configurada no ambiente.');
+  } else if (MP_PUBLIC_KEY.startsWith('APP_USR-')) {
+    console.log('✅ [MERCADO PAGO STARTUP OK] Chave pública de PRODUÇÃO (APP_USR-...) configurada e validada.');
   }
   console.log('==================================================\n');
 }
 
+// Call validation AFTER constants are declared to avoid TDZ (Temporal Dead Zone)
 validateMercadoPagoCredentialsOnStartup();
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.text({ type: '*/*', limit: '10mb' }));
 
-// Default Mercado Pago Access Token provided by store owner
-const DEFAULT_MP_ACCESS_TOKEN = 'APP_USR-7347922819217970-010521-4f7235fc4e8db7b024a5da19c892f407-180258706';
-const DEFAULT_MP_PUBLIC_KEY = process.env.VITE_MERCADO_PAGO_PUBLIC_KEY || process.env.MP_PUBLIC_KEY || 'APP_USR-7365e556-6445-41c0-b5a0-107fad46bd5c';
-
 // Helper to get Mercado Pago client safely
 function getMercadoPagoClient() {
-  const token = process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || DEFAULT_MP_ACCESS_TOKEN;
+  const token = process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || '';
   if (!token) {
     return null;
   }
@@ -78,15 +86,20 @@ function getMercadoPagoClient() {
 // MERCADO PAGO API ENDPOINTS
 // ==========================================
 
-// Public Key Endpoint for Frontend Transparent Checkout
-app.get('/api/mercadopago/public-key', (req, res) => {
-  const publicKey = process.env.VITE_MERCADO_PAGO_PUBLIC_KEY || DEFAULT_MP_PUBLIC_KEY;
+// Public Key Endpoint for Frontend
+const handlePublicKey = (req: express.Request, res: express.Response) => {
+  const publicKey = process.env.MP_PUBLIC_KEY || process.env.VITE_MERCADO_PAGO_PUBLIC_KEY || '';
+  if (!publicKey) {
+    return res.status(500).json({
+      error: 'MP_PUBLIC_KEY_NOT_CONFIGURED',
+      message: 'A chave pública do Mercado Pago (MP_PUBLIC_KEY ou VITE_MERCADO_PAGO_PUBLIC_KEY) não está configurada no ambiente da Vercel.'
+    });
+  }
   res.json({ publicKey });
-});
-app.get('/mercadopago/public-key', (req, res) => {
-  const publicKey = process.env.VITE_MERCADO_PAGO_PUBLIC_KEY || DEFAULT_MP_PUBLIC_KEY;
-  res.json({ publicKey });
-});
+};
+
+app.get('/api/mercadopago/public-key', handlePublicKey);
+app.get('/mercadopago/public-key', handlePublicKey);
 
 // Health Check Endpoint for deployment validation
 app.get('/api/health', (req, res) => {
@@ -607,7 +620,7 @@ const handleCreatePix = async (req: express.Request, res: express.Response) => {
     if (!client) {
       return res.status(400).json({
         error: 'MERCADO_PAGO_NOT_CONFIGURED',
-        message: 'A chave MERCADO_PAGO_ACCESS_TOKEN não está configurada no ambiente.'
+        message: 'A chave MP_ACCESS_TOKEN (ou MERCADO_PAGO_ACCESS_TOKEN) não está configurada no ambiente.'
       });
     }
 
@@ -696,7 +709,7 @@ const handlePaymentStatus = async (req: express.Request, res: express.Response) 
     if (!client) {
       return res.status(400).json({
         error: 'MERCADO_PAGO_NOT_CONFIGURED',
-        message: 'A chave MERCADO_PAGO_ACCESS_TOKEN não está configurada.'
+        message: 'A chave MP_ACCESS_TOKEN (ou MERCADO_PAGO_ACCESS_TOKEN) não está configurada no ambiente.'
       });
     }
 
@@ -724,7 +737,7 @@ app.get('/mercadopago/payment-status/:id', handlePaymentStatus);
 // 3. Create Preference (Checkout Pro / Mercado Pago)
 const handleCreatePreference = async (req: express.Request, res: express.Response) => {
   try {
-    const token = process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || DEFAULT_MP_ACCESS_TOKEN;
+    const token = process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || '';
     const client = getMercadoPagoClient();
     if (!client || !token) {
       return res.status(400).json({
@@ -907,7 +920,12 @@ app.post('/mercadopago/create-preference', handleCreatePreference);
 // 4. Webhook / IPN Notification Handler
 const handleWebhook = async (req: express.Request, res: express.Response) => {
   try {
-    const token = process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || DEFAULT_MP_ACCESS_TOKEN;
+    const token = process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || '';
+    if (!token) {
+      console.warn('[WEBHOOK MP] Chave MP_ACCESS_TOKEN não configurada no servidor.');
+      return res.status(200).json({ status: 'ignored', message: 'MP_ACCESS_TOKEN not configured' });
+    }
+
     const paymentId = req.query['data.id'] || req.query.id || req.body?.data?.id || req.body?.id;
     const topic = req.query.topic || req.query.type || req.body?.type || req.body?.topic;
 
@@ -986,13 +1004,26 @@ app.get('/mercadopago/ipn', handleWebhook);
 // VITE / STATIC SERVING SETUP
 // ==========================================
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-    const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
+  const hasDist = fs.existsSync(path.join(process.cwd(), 'dist', 'index.html'));
+  const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL) || hasDist;
+
+  if (!isProd && !process.env.VERCEL) {
+    try {
+      const viteModuleName = 'vite';
+      const { createServer: createViteServer } = await import(viteModuleName);
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } catch (e) {
+      console.warn('[SERVER] Vite dev middleware unavailable, serving static dist files:', e);
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
