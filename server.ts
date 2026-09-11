@@ -1031,14 +1031,17 @@ async function startServer() {
     });
   }
 
-  if (!process.env.VERCEL) {
+  const isVercelServerless = !!(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
+
+  if (!isVercelServerless) {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on http://0.0.0.0:${PORT}`);
     });
   }
 }
 
-if (!process.env.VERCEL) {
+const isVercelServerless = !!(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
+if (!isVercelServerless) {
   startServer();
 }
 
