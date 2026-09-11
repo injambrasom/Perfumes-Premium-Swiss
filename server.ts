@@ -5,23 +5,39 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import { MercadoPagoConfig, Payment, Preference } from 'mercadopago';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, setDoc } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { PRODUCTS, REFERENCE_PERFUMES_LIST } from './src/data/products';
 
 dotenv.config();
 
 const __dirname = path.resolve();
 
-// Initialize Firestore for server-side order updates in Webhook
+// Fallback Firebase Configuration
+const FALLBACK_FIREBASE_CONFIG = {
+  projectId: "gen-lang-client-0216852920",
+  appId: "1:905476022886:web:94f171a6670c3eef4e03a7",
+  apiKey: "AIzaSyCUrY0l_r3_rwU4zlAmu9F0frBK3AUsewM",
+  authDomain: "gen-lang-client-0216852920.firebaseapp.com",
+  firestoreDatabaseId: "ai-studio-79c8f0b3-973d-460a-a7bd-65f19a2fa2e1",
+  storageBucket: "gen-lang-client-0216852920.firebasestorage.app",
+  messagingSenderId: "905476022886"
+};
+
+// Initialize Firestore for server-side order updates in Webhook & inventory deduction
 let firestoreDb: any = null;
 try {
   const configPath = path.join(__dirname, 'firebase-applet-config.json');
+  let firebaseConfig = FALLBACK_FIREBASE_CONFIG;
   if (fs.existsSync(configPath)) {
-    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    const firebaseApp = initializeApp(firebaseConfig);
-    firestoreDb = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
-    console.log('[FIREBASE SERVER] Firestore connected successfully for webhooks');
+    try {
+      firebaseConfig = { ...FALLBACK_FIREBASE_CONFIG, ...JSON.parse(fs.readFileSync(configPath, 'utf-8')) };
+    } catch {
+      // ignore
+    }
   }
+  const firebaseApp = initializeApp(firebaseConfig);
+  firestoreDb = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || FALLBACK_FIREBASE_CONFIG.firestoreDatabaseId);
+  console.log('[FIREBASE SERVER] Firestore connected successfully for webhooks and inventory management');
 } catch (err) {
   console.warn('[FIREBASE SERVER] Firestore initialization warning:', err);
 }
@@ -586,7 +602,7 @@ updateRoutes.forEach(route => {
 });
 
 // Deduct inventory when sale is confirmed
-app.post('/api/inventory/deduct', (req, res) => {
+app.post('/api/inventory/deduct', async (req, res) => {
   const { items } = req.body || {};
   if (!Array.isArray(items)) {
     return res.status(400).json({ success: false, error: 'items must be an array' });
@@ -595,12 +611,39 @@ app.post('/api/inventory/deduct', (req, res) => {
   const deductions: Array<{ productId: string; size: string; quantity: number; newStock: number }> = [];
 
   for (const item of items) {
-    const { productId, size, quantity = 1 } = item;
-    if (productId && size && INVENTORY_STORE[productId]) {
-      const current = INVENTORY_STORE[productId][size as '15ml' | '55ml' | '100ml'] || 0;
-      const updated = Math.max(0, current - quantity);
-      INVENTORY_STORE[productId][size as '15ml' | '55ml' | '100ml'] = updated;
-      deductions.push({ productId, size, quantity, newStock: updated });
+    const rawId = item.productId || item.id || item.product || item.name;
+    const resolvedId = resolveProductKey(rawId) || rawId;
+    const size = item.size || '100ml';
+    const quantity = Number(item.quantity || 1);
+
+    if (resolvedId) {
+      const normSize = (size.includes('15') ? '15ml' : size.includes('55') ? '55ml' : '100ml') as '15ml' | '55ml' | '100ml';
+      
+      if (INVENTORY_STORE[resolvedId]) {
+        const current = INVENTORY_STORE[resolvedId][normSize] || 0;
+        const updated = Math.max(0, current - quantity);
+        INVENTORY_STORE[resolvedId][normSize] = updated;
+        deductions.push({ productId: resolvedId, size: normSize, quantity, newStock: updated });
+      }
+
+      if (firestoreDb) {
+        try {
+          const invDocRef = doc(firestoreDb, 'inventory', resolvedId);
+          const invSnap = await getDoc(invDocRef);
+          if (invSnap.exists()) {
+            const invData = invSnap.data();
+            const currQty = Number(invData[normSize] ?? 0);
+            const newQty = Math.max(0, currQty - quantity);
+            await updateDoc(invDocRef, {
+              [normSize]: newQty,
+              updatedAt: new Date().toISOString()
+            });
+            console.log(`[INVENTORY DEDUCT] Firestore inventory updated for ${resolvedId} (${normSize}: ${newQty})`);
+          }
+        } catch (err) {
+          console.warn(`[INVENTORY DEDUCT] Firestore update warning for ${resolvedId}:`, err);
+        }
+      }
     }
   }
 
@@ -965,6 +1008,66 @@ const handleWebhook = async (req: express.Request, res: express.Response) => {
 
       try {
         const orderDocRef = doc(firestoreDb, 'orders', String(orderId));
+        
+        // If approved, deduct items from inventory
+        if (status === 'approved') {
+          let itemsToDeduct: Array<{ productId: string; size: string; quantity: number }> = [];
+
+          try {
+            const orderSnap = await getDoc(orderDocRef);
+            if (orderSnap.exists()) {
+              const orderData = orderSnap.data();
+              if (Array.isArray(orderData.items)) {
+                itemsToDeduct = orderData.items.map((i: any) => ({
+                  productId: i.productId || i.id || i.product?.id,
+                  size: i.size || i.selectedSize || '100ml',
+                  quantity: Number(i.quantity || 1)
+                }));
+              }
+            }
+          } catch {
+            // ignore
+          }
+
+          if (itemsToDeduct.length === 0 && Array.isArray(paymentData.additional_info?.items)) {
+            itemsToDeduct = paymentData.additional_info.items.map((i: any) => ({
+              productId: i.id || i.title,
+              size: i.description || '100ml',
+              quantity: Number(i.quantity || 1)
+            }));
+          }
+
+          for (const item of itemsToDeduct) {
+            const rawId = item.productId;
+            const targetId = resolveProductKey(rawId) || rawId;
+            const normSize = (item.size.includes('15') ? '15ml' : item.size.includes('55') ? '55ml' : '100ml') as '15ml' | '55ml' | '100ml';
+
+            if (targetId) {
+              if (INVENTORY_STORE[targetId]) {
+                const curr = INVENTORY_STORE[targetId][normSize] || 0;
+                INVENTORY_STORE[targetId][normSize] = Math.max(0, curr - item.quantity);
+              }
+
+              try {
+                const invDocRef = doc(firestoreDb, 'inventory', targetId);
+                const invSnap = await getDoc(invDocRef);
+                if (invSnap.exists()) {
+                  const invData = invSnap.data();
+                  const currQty = Number(invData[normSize] ?? 0);
+                  const newQty = Math.max(0, currQty - item.quantity);
+                  await updateDoc(invDocRef, {
+                    [normSize]: newQty,
+                    updatedAt: new Date().toISOString()
+                  });
+                  console.log(`[WEBHOOK MP] Stock deducted for product ${targetId} (${normSize}: ${newQty})`);
+                }
+              } catch (invErr) {
+                console.warn(`[WEBHOOK MP] Error deducting Firestore stock for ${targetId}:`, invErr);
+              }
+            }
+          }
+        }
+
         await setDoc(orderDocRef, {
           status: mappedStatus,
           paymentId: String(paymentId),

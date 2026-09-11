@@ -233,6 +233,108 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         if (returnOrderId) {
           setOrderId(returnOrderId);
         }
+
+        // Recover pending order details from localStorage
+        let restoredOrder: Order | null = null;
+        try {
+          if (returnOrderId) {
+            const specific = localStorage.getItem(`swiss_pending_order_${returnOrderId}`);
+            if (specific) restoredOrder = JSON.parse(specific);
+          }
+          if (!restoredOrder) {
+            const lastPending = localStorage.getItem('swiss_last_pending_order');
+            if (lastPending) restoredOrder = JSON.parse(lastPending);
+          }
+          if (!restoredOrder) {
+            const backupStr = localStorage.getItem('swiss_orders_backup');
+            if (backupStr) {
+              const orders = JSON.parse(backupStr);
+              if (Array.isArray(orders)) {
+                restoredOrder = orders.find((o: any) => o.id === returnOrderId || o.orderNumber === returnOrderId) || orders[0];
+              }
+            }
+          }
+        } catch {
+          // ignore
+        }
+
+        if (restoredOrder) {
+          const c = restoredOrder.customer || {};
+          const snapshotItems = (restoredOrder.items || []).map((i: any) => ({
+            product: {
+              id: i.productId || i.id,
+              name: i.name || i.referenceName || 'Perfume Swiss',
+              referenceName: i.referenceName || '',
+              image: i.image || '',
+              stockPerSize: { '15ml': 10, '55ml': 10, '100ml': 10 }
+            } as any,
+            selectedSize: i.size || '100ml',
+            selectedPrice: i.price || 0,
+            quantity: i.quantity || 1
+          }));
+
+          setSubmittedOrderInfo({
+            orderId: restoredOrder.id || returnOrderId || `SWISS-${Math.floor(10000 + Math.random() * 90000)}`,
+            total: restoredOrder.total || 0,
+            subtotal: restoredOrder.subtotal || restoredOrder.total || 0,
+            shipping: restoredOrder.shipping || 0,
+            discount: restoredOrder.discount || 0,
+            paymentMethod: restoredOrder.paymentMethod || 'credit_card',
+            installmentLabel: 'Mercado Pago (Aprovado)',
+            installmentShortLabel: 'Aprovado',
+            name: c.name || '',
+            street: c.street || '',
+            number: c.number || '',
+            city: c.city || '',
+            state: c.state || '',
+            phone: c.phone || '',
+            email: c.email || '',
+            cpf: c.cpf || '',
+            items: snapshotItems
+          });
+
+          // Deduct stock immediately when payment is approved
+          if (status === 'approved' && restoredOrder.items && restoredOrder.items.length > 0) {
+            const formattedItems = restoredOrder.items.map((i: any) => ({
+              productId: i.productId || i.id,
+              size: (i.size || '100ml') as '15ml' | '55ml' | '100ml',
+              quantity: i.quantity || 1
+            }));
+
+            deductStockInFirebase(formattedItems).catch(() => {});
+            fetch('/api/inventory/deduct', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ items: formattedItems })
+            }).catch(() => {});
+
+            updateOrderStatusInFirebase(restoredOrder.id || returnOrderId, 'pago').catch(() => {});
+          }
+
+          // Trigger automatic WhatsApp redirect on approved return
+          if (status === 'approved') {
+            setTimeout(() => {
+              const activeItems = snapshotItems;
+              const itemsList = activeItems.map(i => `• ${i.product.name} (${i.selectedSize}) - R$ ${i.selectedPrice.toFixed(2)} x${i.quantity}`).join('\n');
+              const message = `*NOVO PEDIDO CONFIRMADO - PERFUMES PREMIUM SWISS*\n\n` +
+                `*Número do Pedido:* ${restoredOrder.id || returnOrderId}\n` +
+                `*Cliente:* ${c.name || 'Cliente'}\n` +
+                `*CPF:* ${c.cpf || ''}\n` +
+                `*E-mail:* ${c.email || ''}\n` +
+                `*WhatsApp:* ${c.phone || ''}\n\n` +
+                `*Endereço de Entrega:*\n` +
+                `${c.street || ''}, Nº ${c.number || ''}\n` +
+                `${c.neighborhood || ''} - ${c.city || ''}/${c.state || ''} - CEP ${c.cep || ''}\n\n` +
+                `*Itens do Pedido:*\n${itemsList}\n\n` +
+                `*Forma de Pagamento:* Mercado Pago (Aprovado)\n` +
+                `*Total do Pedido:* R$ ${(restoredOrder.total || 0).toFixed(2).replace('.', ',')}\n\n` +
+                `Gostaria de acompanhar o envio e código de rastreio!`;
+
+              window.open(`https://wa.me/5554999893370?text=${encodeURIComponent(message)}`, '_blank');
+            }, 800);
+          }
+        }
+
         setStep('success');
         try {
           onClearCart();
@@ -242,8 +344,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         // Clean URL parameters cleanly without page refresh
         window.history.replaceState({}, document.title, window.location.pathname);
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error('[CHECKOUT RETURN]: Error handling Mercado Pago return:', err);
     }
   }, [onClearCart]);
 
@@ -538,6 +640,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         localOrders.unshift(fullOrderPayload);
         localStorage.setItem('swiss_orders_backup', JSON.stringify(localOrders.slice(0, 100)));
       }
+      localStorage.setItem('swiss_last_pending_order', JSON.stringify(fullOrderPayload));
+      localStorage.setItem(`swiss_pending_order_${currentOrderId}`, JSON.stringify(fullOrderPayload));
     } catch {
       // ignore
     }
@@ -714,7 +818,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     const activeState = submittedOrderInfo?.state || formData.state;
     const activeCep = formData.cep;
 
-    const itemsList = activeItems.map(i => `• ${i.product.name} (${i.selectedSize || '100ml'}) - R$ ${i.selectedPrice.toFixed(2)} x${i.quantity}`).join('\n');
+    const itemsList = activeItems.map(i => {
+      const pName = i.product?.name || (i as any).name || (i as any).referenceName || 'Perfume Swiss';
+      const pSize = i.selectedSize || (i as any).size || '100ml';
+      const pPrice = typeof i.selectedPrice === 'number' ? i.selectedPrice : (typeof (i as any).price === 'number' ? (i as any).price : 0);
+      const pQty = i.quantity || 1;
+      return `• ${pName} (${pSize}) - R$ ${pPrice.toFixed(2)} x${pQty}`;
+    }).join('\n');
     const installmentPlan = paymentMethod === 'credit_card' 
       ? (submittedOrderInfo?.installmentLabel || getInstallmentInfo(formData.installments).label)
       : 'PIX (Aprovado/Comprovante)';
