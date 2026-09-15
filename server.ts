@@ -79,11 +79,21 @@ function validateMercadoPagoCredentialsOnStartup() {
 validateMercadoPagoCredentialsOnStartup();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.NGINX_PORT
+  ? parseInt(process.env.DEFAULT_APP_PORT || '3000', 10)
+  : parseInt(process.env.PORT || '3000', 10);
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Health Check Endpoints for Cloud Run & Load Balancers
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+app.get('/api/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // Helper to get Mercado Pago client safely
 function getMercadoPagoClient() {
@@ -743,6 +753,138 @@ const handleCreatePix = async (req: express.Request, res: express.Response) => {
 
 app.post('/api/mercadopago/create-pix', handleCreatePix);
 app.post('/mercadopago/create-pix', handleCreatePix);
+
+// 1b. Process Transparent Credit Card Payment (Checkout Transparente)
+const handleProcessCard = async (req: express.Request, res: express.Response) => {
+  try {
+    const client = getMercadoPagoClient();
+    if (!client) {
+      return res.status(400).json({
+        error: 'MERCADO_PAGO_NOT_CONFIGURED',
+        message: 'A chave MP_ACCESS_TOKEN não está configurada no servidor.'
+      });
+    }
+
+    const {
+      token,
+      payment_method_id,
+      issuer_id,
+      installments,
+      transaction_amount,
+      description,
+      payer,
+      orderId,
+      card_number,
+      cardholder,
+      expiration_month,
+      expiration_year,
+      security_code
+    } = req.body;
+
+    let cardToken = token;
+
+    // If no token was provided from frontend SDK, create token on server using MP Public Key / API
+    if (!cardToken && card_number) {
+      const publicKey = process.env.MP_PUBLIC_KEY || process.env.VITE_MERCADO_PAGO_PUBLIC_KEY || 'APP_USR-7e44a0e1-4c6c-4861-9c88-66df5bb4f8fb';
+      const cleanCard = String(card_number).replace(/\D/g, '');
+      const cleanCpf = String(payer?.cpf || cardholder?.identification?.number || '').replace(/\D/g, '');
+
+      const tokenRes = await fetch(`https://api.mercadopago.com/v1/card_tokens?public_key=${publicKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          card_number: cleanCard,
+          expiration_month: parseInt(String(expiration_month), 10),
+          expiration_year: parseInt(String(expiration_year).length === 2 ? `20${expiration_year}` : expiration_year, 10),
+          security_code: String(security_code),
+          cardholder: {
+            name: String(cardholder?.name || payer?.name || 'TITULAR DO CARTAO').toUpperCase(),
+            identification: {
+              type: cleanCpf.length === 14 ? 'CNPJ' : 'CPF',
+              number: cleanCpf
+            }
+          }
+        })
+      });
+
+      const tokenData = await tokenRes.json().catch(() => null);
+      if (tokenRes.ok && tokenData && tokenData.id) {
+        cardToken = tokenData.id;
+      } else {
+        const errorMsg = tokenData?.cause?.[0]?.description || tokenData?.message || 'Dados do cartão inválidos. Verifique o número, validade e CVV.';
+        return res.status(400).json({
+          error: 'CARD_TOKEN_FAILED',
+          message: errorMsg
+        });
+      }
+    }
+
+    if (!cardToken) {
+      return res.status(400).json({
+        error: 'MISSING_CARD_TOKEN',
+        message: 'Por favor, preencha os dados do cartão de crédito corretamente.'
+      });
+    }
+
+    const cleanCpf = String(payer?.cpf || '').replace(/\D/g, '');
+    const cleanPhone = String(payer?.phone || '').replace(/\D/g, '');
+    const areaCode = cleanPhone.length >= 10 ? cleanPhone.slice(0, 2) : '11';
+    const phoneNumber = cleanPhone.length >= 10 ? cleanPhone.slice(2) : (cleanPhone.length > 0 ? cleanPhone : '999999999');
+    const cleanCep = String(payer?.cep || '').replace(/\D/g, '');
+    const rawNumber = parseInt(String(payer?.number || '').replace(/\D/g, ''), 10);
+    const streetNum = isNaN(rawNumber) || rawNumber <= 0 ? 100 : rawNumber;
+
+    const payment = new Payment(client);
+    const body: any = {
+      transaction_amount: Number(Number(transaction_amount).toFixed(2)),
+      token: cardToken,
+      description: description || `Perfumes Premium Swiss - Pedido ${orderId}`,
+      installments: Math.max(1, parseInt(String(installments || 1), 10)),
+      payment_method_id: payment_method_id || 'visa',
+      payer: {
+        email: payer?.email && payer.email.includes('@') ? payer.email.trim() : 'cliente@swiss.com',
+        first_name: (String(payer?.name || '').trim().split(/\s+/)[0] || 'Cliente').substring(0, 50),
+        last_name: (String(payer?.name || '').trim().split(/\s+/).slice(1).join(' ') || 'Swiss').substring(0, 50),
+        identification: {
+          type: cleanCpf.length === 14 ? 'CNPJ' : 'CPF',
+          number: cleanCpf
+        },
+        address: {
+          zip_code: cleanCep.length === 8 ? cleanCep : '01001000',
+          street_name: String(payer?.street || 'Rua').trim().substring(0, 250),
+          street_number: streetNum
+        }
+      },
+      external_reference: String(orderId || `SWISS-${Date.now()}`)
+    };
+
+    if (issuer_id) {
+      body.issuer_id = String(issuer_id);
+    }
+
+    const response = await payment.create({ body });
+
+    return res.json({
+      success: response.status === 'approved',
+      status: response.status,
+      status_detail: response.status_detail,
+      id: response.id,
+      payment_method_id: response.payment_method_id,
+      transaction_amount: response.transaction_amount,
+      installments: response.installments
+    });
+  } catch (error: any) {
+    console.error('❌ Error processing transparent card payment:', error);
+    const msg = error?.message || error?.cause?.[0]?.description || 'Erro ao processar pagamento via cartão no Mercado Pago.';
+    return res.status(400).json({
+      error: 'CARD_PAYMENT_FAILED',
+      message: msg
+    });
+  }
+};
+
+app.post('/api/mercadopago/process-card', handleProcessCard);
+app.post('/mercadopago/process-card', handleProcessCard);
 
 // 2. Check Payment Status
 const handlePaymentStatus = async (req: express.Request, res: express.Response) => {

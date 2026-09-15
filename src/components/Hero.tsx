@@ -205,7 +205,7 @@ export const Hero: React.FC<HeroProps> = ({
 
   return (
     <section 
-      className="relative min-h-[80vh] lg:min-h-[88vh] flex items-center justify-center bg-[#0B0B0B] text-white overflow-hidden pt-16 sm:pt-20 pb-4 select-none"
+      className={`relative flex items-center justify-center bg-[#0B0B0B] text-white overflow-hidden pt-16 sm:pt-20 pb-2 sm:pb-4 select-none ${currentSlide.imageUrl ? 'min-h-[260px] sm:min-h-[400px] lg:min-h-[550px]' : 'min-h-[75vh] lg:min-h-[85vh]'}`}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
@@ -283,7 +283,7 @@ export const Hero: React.FC<HeroProps> = ({
       )}
 
       {/* CAROUSEL CONTAINER */}
-      <div className="relative z-10 w-full min-h-[80vh] lg:min-h-[88vh] flex flex-col justify-between">
+      <div className={`relative z-10 w-full flex flex-col justify-between ${currentSlide.imageUrl ? 'h-auto' : 'min-h-[70vh] lg:min-h-[80vh]'}`}>
 
         {/* Slide Content Area */}
         <div className="w-full flex-1 flex items-center justify-center relative">
@@ -317,11 +317,11 @@ export const Hero: React.FC<HeroProps> = ({
                 onClick={() => handleCtaClick(currentSlide)}
                 className="w-full max-w-[1500px] mx-auto relative overflow-hidden cursor-pointer group bg-[#0B0B0B]"
               >
-                {/* Full Width Banner Graphic Image - 100% Uncropped */}
+                {/* Full Width Banner Graphic Image - 100% Uncropped & Gap-free */}
                 <img
                   src={currentSlide.imageUrl}
                   alt={currentSlide.title}
-                  className="w-full h-auto min-h-[220px] sm:min-h-0 max-h-[82vh] object-cover sm:object-contain object-center transition-transform duration-700 group-hover:scale-[1.005] block"
+                  className="w-full h-auto object-cover object-center transition-transform duration-700 group-hover:scale-[1.005] block"
                 />
 
                 {/* SPECIAL HIGH-IMPACT TYPOGRAPHY OVERLAY FOR TRIO DE BOLSO BANNER */}

@@ -259,7 +259,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         }
 
         if (restoredOrder) {
-          const c = restoredOrder.customer || {};
+          const c: any = (restoredOrder as any).customer || {};
           const snapshotItems = (restoredOrder.items || []).map((i: any) => ({
             product: {
               id: i.productId || i.id,
@@ -279,7 +279,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             subtotal: restoredOrder.subtotal || restoredOrder.total || 0,
             shipping: restoredOrder.shipping || 0,
             discount: restoredOrder.discount || 0,
-            paymentMethod: restoredOrder.paymentMethod || 'credit_card',
+            paymentMethod: (restoredOrder.paymentMethod === 'pix' ? 'pix' : 'credit_card') as PaymentMethod,
             installmentLabel: 'Mercado Pago (Aprovado)',
             installmentShortLabel: 'Aprovado',
             name: c.name || '',
@@ -561,6 +561,24 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (!formData.street.trim()) errors.street = 'Rua/Avenida é obrigatória';
     if (!formData.number.trim()) errors.number = 'Número é obrigatório';
 
+    if (paymentMethod === 'credit_card') {
+      const cleanCard = formData.cardNumber.replace(/\D/g, '');
+      if (!cleanCard || cleanCard.length < 13) {
+        errors.cardNumber = 'Número do cartão inválido';
+      }
+      if (!formData.cardName.trim()) {
+        errors.cardName = 'Nome impresso no cartão é obrigatório';
+      }
+      const cleanExpiry = formData.cardExpiry.replace(/\D/g, '');
+      if (!cleanExpiry || cleanExpiry.length < 4) {
+        errors.cardExpiry = 'Validade inválida (MM/AA)';
+      }
+      const cleanCvv = formData.cardCvv.replace(/\D/g, '');
+      if (!cleanCvv || cleanCvv.length < 3) {
+        errors.cardCvv = 'CVV inválido';
+      }
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -576,6 +594,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     const snapshotDiscount = paymentMethod === 'pix' ? (subtotal * 0.05) : 0;
     const snapshotTotal = Math.max(0, (subtotal + freightCost) - snapshotDiscount);
     const snapshotItems = [...items];
+    const instInfo = getInstallmentInfo(formData.installments);
 
     // Freeze snapshot so clearing cart won't zero out totals on success screen
     setSubmittedOrderInfo({
@@ -585,8 +604,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       shipping: freightCost,
       discount: snapshotDiscount,
       paymentMethod: paymentMethod,
-      installmentLabel: `À vista ou parcelado no Mercado Pago`,
-      installmentShortLabel: `Cartão de Crédito`,
+      installmentLabel: paymentMethod === 'credit_card' ? instInfo.label : 'PIX com 5% de Desconto',
+      installmentShortLabel: paymentMethod === 'credit_card' ? instInfo.shortLabel : 'PIX',
       name: formData.name.trim(),
       street: formData.street.trim(),
       number: formData.number.trim(),
@@ -702,23 +721,35 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         setTimer(900);
       }
     } else {
-      // CHECKOUT PRO (REDIRECT TO MERCADO PAGO SECURE CHECKOUT PAGE)
+      // CHECKOUT TRANSPARENTE (PROCESS CREDIT CARD DIRECTLY ON SITE)
       try {
-        const response = await fetch('/api/mercadopago/create-preference', {
+        const cleanDocNum = formData.cpf.replace(/\D/g, '');
+        const expParts = formData.cardExpiry.split('/');
+        const expMonth = expParts[0] ? expParts[0].trim() : '12';
+        const expYear = expParts[1] ? expParts[1].trim() : '28';
+
+        const response = await fetch('/api/mercadopago/process-card', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            items: snapshotItems.map((i) => ({
-              productId: i.product.id,
-              name: i.product.name,
-              referenceName: i.product.referenceName,
-              size: i.selectedSize || '100ml',
-              quantity: i.quantity,
-              price: i.selectedPrice
-            })),
+            card_number: formData.cardNumber.replace(/\D/g, ''),
+            cardholder: {
+              name: formData.cardName.trim().toUpperCase(),
+              identification: {
+                type: cleanDocNum.length === 14 ? 'CNPJ' : 'CPF',
+                number: cleanDocNum
+              }
+            },
+            expiration_month: parseInt(expMonth, 10),
+            expiration_year: parseInt(expYear.length === 2 ? `20${expYear}` : expYear, 10),
+            security_code: formData.cardCvv.trim(),
+            installments: parseInt(formData.installments || '1', 10),
+            transaction_amount: snapshotTotal,
+            description: `Perfumes Premium Swiss - Pedido ${currentOrderId}`,
+            orderId: currentOrderId,
             payer: {
-              name: formData.name.trim(),
               email: formData.email.trim(),
+              name: formData.name.trim(),
               phone: formData.phone.trim(),
               cpf: formData.cpf.trim(),
               cep: formData.cep.trim(),
@@ -728,35 +759,30 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               neighborhood: formData.neighborhood.trim(),
               city: formData.city.trim(),
               state: formData.state.trim()
-            },
-            orderId: currentOrderId,
-            shippingCost: freightCost,
-            total: snapshotTotal
+            }
           })
         });
 
         const data = await response.json().catch(() => null);
 
-        if (response.ok && data && (data.init_point || data.sandbox_init_point)) {
-          const redirectUrl = data.init_point || data.sandbox_init_point;
+        if (response.ok && data && (data.success || data.status === 'approved' || data.status === 'in_process')) {
+          updateOrderStatusInFirebase(currentOrderId, data.status === 'approved' ? 'pago' : 'pendente').catch(() => {});
+
+          setStep('success');
           try {
             onClearCart();
           } catch {
             // ignore
           }
-          window.location.href = redirectUrl;
           return;
         } else {
-          let errorMsg = data?.message || 'Não foi possível gerar a preferência do Mercado Pago. Tente novamente ou pague via PIX.';
-          if (data?.details && typeof data.details === 'string' && !errorMsg.includes(data.details)) {
-            errorMsg += ` (${data.details})`;
-          }
+          let errorMsg = data?.message || 'Pagamento não aprovado pela operadora do cartão. Verifique os dados ou pague via PIX com 5% de desconto.';
           setMpError(errorMsg);
           setStep('form');
         }
       } catch (err: any) {
-        console.error('Error creating Mercado Pago preference:', err);
-        setMpError('Falha ao conectar com o Mercado Pago. Por favor, tente novamente ou escolha PIX.');
+        console.error('Error processing Mercado Pago transparent card payment:', err);
+        setMpError('Falha ao comunicar com o Mercado Pago. Por favor, tente novamente ou escolha PIX.');
         setStep('form');
       }
     }
