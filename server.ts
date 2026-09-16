@@ -115,7 +115,7 @@ function validateMercadoPagoCredentialsOnStartup() {
 validateMercadoPagoCredentialsOnStartup();
 
 const app = express();
-const PORT = parseInt(process.env.DEFAULT_APP_PORT || (process.env.NGINX_PORT ? '3000' : (process.env.PORT || '3000')), 10);
+const PORT = parseInt(process.env.PORT || process.env.DEFAULT_APP_PORT || '3000', 10);
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
