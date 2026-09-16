@@ -30,6 +30,23 @@ interface HeroSlide {
   productId?: string;
 }
 
+const slideVariants = {
+  enter: (dir: number) => ({
+    x: dir > 0 ? '100%' : '-100%',
+    opacity: 0,
+  }),
+  center: {
+    zIndex: 1,
+    x: '0%',
+    opacity: 1,
+  },
+  exit: (dir: number) => ({
+    zIndex: 0,
+    x: dir < 0 ? '100%' : '-100%',
+    opacity: 0,
+  }),
+};
+
 export const Hero: React.FC<HeroProps> = ({ 
   onChoosePerfume, 
   onOpenWhatsApp, 
@@ -37,7 +54,7 @@ export const Hero: React.FC<HeroProps> = ({
   products = [],
   onQuickView
 }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [[page, direction], setPage] = useState([0, 0]);
   const [isPaused, setIsPaused] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
@@ -133,22 +150,24 @@ export const Hero: React.FC<HeroProps> = ({
     }
   ];
 
+  const currentIndex = ((page % slides.length) + slides.length) % slides.length;
+  const currentSlide = slides[currentIndex];
+
+  const paginate = (newDirection: number) => {
+    setPage([page + newDirection, newDirection]);
+  };
+
+  const handleNext = () => paginate(1);
+  const handlePrev = () => paginate(-1);
+
   // Auto-play timer (5s)
   useEffect(() => {
     if (isPaused) return;
     const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % slides.length);
+      paginate(1);
     }, 5000);
     return () => clearInterval(timer);
-  }, [isPaused, slides.length]);
-
-  const handleNext = () => {
-    setCurrentIndex((prev) => (prev + 1) % slides.length);
-  };
-
-  const handlePrev = () => {
-    setCurrentIndex((prev) => (prev - 1 + slides.length) % slides.length);
-  };
+  }, [isPaused, page]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -161,8 +180,8 @@ export const Hero: React.FC<HeroProps> = ({
   const handleTouchEnd = () => {
     if (!touchStartX.current || !touchEndX.current) return;
     const distance = touchStartX.current - touchEndX.current;
-    if (distance > 50) handleNext();
-    else if (distance < -50) handlePrev();
+    if (distance > 40) handleNext();
+    else if (distance < -40) handlePrev();
     touchStartX.current = null;
     touchEndX.current = null;
   };
@@ -190,8 +209,6 @@ export const Hero: React.FC<HeroProps> = ({
     onChoosePerfume();
   };
 
-  const currentSlide = slides[currentIndex];
-
   const renderBadgeIcon = (type: string) => {
     switch (type) {
       case 'award': return <Award className="w-3.5 h-3.5 text-[#C5A059]" />;
@@ -212,122 +229,57 @@ export const Hero: React.FC<HeroProps> = ({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Central Background Video Overlay (Only shown on non-image slides) */}
-      {!currentSlide.imageUrl && (
-        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            poster={heroImg}
-            className="w-full h-full object-cover object-center opacity-35 scale-105 transform transition-transform duration-[10000ms]"
+      {/* CAROUSEL VIEWPORT CONTAINER */}
+      <div className="relative w-full h-[280px] sm:h-[420px] md:h-[480px] lg:h-[540px] overflow-hidden bg-[#0B0B0B]">
+        
+        {/* Floating Side Navigation Arrows */}
+        <button
+          onClick={handlePrev}
+          aria-label="Banner anterior"
+          className="absolute left-1.5 sm:left-6 top-1/2 -translate-y-1/2 z-30 w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
+        >
+          <ChevronLeft className="w-4 h-4 sm:w-6 sm:h-6 transform group-hover:-translate-x-0.5 transition-transform" />
+        </button>
+
+        <button
+          onClick={handleNext}
+          aria-label="Próximo banner"
+          className="absolute right-1.5 sm:right-6 top-1/2 -translate-y-1/2 z-30 w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
+        >
+          <ChevronRight className="w-4 h-4 sm:w-6 sm:h-6 transform group-hover:translate-x-0.5 transition-transform" />
+        </button>
+
+        {/* Dynamic Overlapping Slide Transitions */}
+        <AnimatePresence initial={false} custom={direction}>
+          <motion.div
+            key={page}
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{
+              x: { type: "spring", stiffness: 280, damping: 30 },
+              opacity: { duration: 0.25 }
+            }}
+            className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden"
           >
-            <source
-              src="https://assets.mixkit.co/videos/3141/3141-720.mp4"
-              type="video/mp4"
-            />
-            <img 
-              src={heroImg}
-              alt="Perfumes Premium Swiss"
-              className="w-full h-full object-cover object-center"
-            />
-          </video>
-          {/* Soft dark vignettes across center stage */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0B] via-[#0B0B0B]/40 to-[#0B0B0B]/80" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0B0B0B] via-[#0B0B0B]/20 to-[#0B0B0B]" />
-        </div>
-      )}
-
-      {/* LEFT & RIGHT SIDE MODELS - Only on Main Hero & 5% OFF Pix Slides */}
-      {!currentSlide.imageUrl && (
-        <>
-          {/* LEFT SIDE MODEL */}
-          <motion.div 
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 1.2, delay: 0.2 }}
-            className="absolute left-0 top-0 bottom-0 w-1/2 lg:w-[30%] z-1 pointer-events-none select-none overflow-hidden"
-          >
-            <div className="relative w-full h-full opacity-35 lg:opacity-100">
-              <img 
-                src={maleModelGeneric} 
-                alt="Modelo Masculino High Fashion Swiss Atelier" 
-                className="w-full h-full object-cover object-top opacity-90 lg:hover:opacity-100 transition-opacity duration-700"
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#0B0B0B]/30 lg:via-[#0B0B0B]/20 to-[#0B0B0B]" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0B] via-transparent to-[#0B0B0B]/70" />
-              <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B0B]/80 via-transparent to-[#0B0B0B]" />
-            </div>
-          </motion.div>
-
-          {/* RIGHT SIDE MODEL */}
-          <motion.div 
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 1.2, delay: 0.2 }}
-            className="absolute right-0 top-0 bottom-0 w-1/2 lg:w-[30%] z-1 pointer-events-none select-none overflow-hidden"
-          >
-            <div className="relative w-full h-full opacity-35 lg:opacity-100">
-              <img 
-                src={femaleModelGeneric} 
-                alt="Modelo Feminino High Fashion Swiss Atelier" 
-                className="w-full h-full object-cover object-top opacity-90 lg:hover:opacity-100 transition-opacity duration-700"
-              />
-              <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#0B0B0B]/30 lg:via-[#0B0B0B]/20 to-[#0B0B0B]" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0B] via-transparent to-[#0B0B0B]/70" />
-              <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B0B]/80 via-transparent to-[#0B0B0B]" />
-            </div>
-          </motion.div>
-        </>
-      )}
-
-      {/* CAROUSEL CONTAINER */}
-      <div className={`relative z-10 w-full flex flex-col justify-between pt-0 ${currentSlide.imageUrl ? 'h-auto' : 'min-h-[60vh] sm:min-h-[70vh] lg:min-h-[80vh] py-8'}`}>
-
-        {/* Slide Content Area */}
-        <div className="w-full flex-1 flex items-center justify-center relative">
-          
-          {/* Side Floating Navigation Arrows */}
-          <button
-            onClick={handlePrev}
-            aria-label="Banner anterior"
-            className="absolute left-1.5 sm:left-6 top-1/2 -translate-y-1/2 z-30 w-8 h-8 sm:w-14 sm:h-14 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
-          >
-            <ChevronLeft className="w-5 h-5 sm:w-7 sm:h-7 transform group-hover:-translate-x-0.5 transition-transform" />
-          </button>
-
-          <button
-            onClick={handleNext}
-            aria-label="Próximo banner"
-            className="absolute right-1.5 sm:right-6 top-1/2 -translate-y-1/2 z-30 w-8 h-8 sm:w-14 sm:h-14 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
-          >
-            <ChevronRight className="w-5 h-5 sm:w-7 sm:h-7 transform group-hover:translate-x-0.5 transition-transform" />
-          </button>
-
-          <AnimatePresence mode="wait">
             {currentSlide.imageUrl ? (
               /* FULL EDGE-TO-EDGE UNCROPPED WEBSITE BANNER */
-              <motion.div
-                key={currentSlide.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.4 }}
+              <div
                 onClick={() => handleCtaClick(currentSlide)}
-                className="w-full max-w-[1500px] mx-auto relative overflow-hidden cursor-pointer group bg-[#0B0B0B]"
+                className="w-full h-full relative cursor-pointer group bg-[#0B0B0B] overflow-hidden flex items-center justify-center"
               >
-                {/* Full Width Banner Graphic Image - 100% Uncropped & Gap-free */}
                 <img
                   src={currentSlide.imageUrl}
                   alt={currentSlide.title}
-                  className="w-full h-auto object-cover object-center transition-transform duration-700 group-hover:scale-[1.005] block"
+                  className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.008] block"
                 />
 
                 {/* SPECIAL HIGH-IMPACT TYPOGRAPHY OVERLAY FOR TRIO DE BOLSO BANNER */}
                 {currentSlide.id === 'trio' ? (
-                  <div className="absolute inset-0 z-20 flex flex-col justify-between p-2.5 sm:p-8 md:pl-28 md:py-12 pointer-events-none bg-gradient-to-r from-black/90 via-black/50 to-transparent sm:from-black/80 sm:via-black/30 sm:to-transparent pl-8 sm:pl-20 md:pl-28">
-                    {/* Top Row Badges */}
+                  <div className="absolute inset-0 z-20 flex flex-col justify-between p-3 sm:p-8 md:pl-28 md:py-12 pointer-events-none bg-gradient-to-r from-black/90 via-black/50 to-transparent pl-8 sm:pl-20 md:pl-28">
+                    {/* Top Badges */}
                     <div className="flex items-center justify-between w-full pointer-events-auto">
                       <div className="inline-flex items-center gap-1.5 px-2 py-0.5 sm:px-3.5 sm:py-1.5 rounded-full bg-black/80 border border-[#C5A059] text-[#C5A059] font-bold text-[8px] sm:text-xs backdrop-blur-md shadow-lg">
                         <Gift className="w-2.5 h-2.5 sm:w-4 sm:h-4 text-[#C5A059]" />
@@ -341,7 +293,7 @@ export const Hero: React.FC<HeroProps> = ({
                       </div>
                     </div>
 
-                    {/* Middle Main Content */}
+                    {/* Middle Content */}
                     <div className="my-auto pointer-events-auto space-y-0.5 sm:space-y-3 max-w-[80%] sm:max-w-lg text-left">
                       <span className="text-[8px] sm:text-xs font-sans tracking-[0.15em] sm:tracking-[0.25em] uppercase text-[#C5A059] font-bold block drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">
                         MONTE SEU CONJUNTO PERSONALIZADO
@@ -391,7 +343,6 @@ export const Hero: React.FC<HeroProps> = ({
                 ) : (
                   /* DEFAULT OVERLAY FOR PRODUCT BANNERS (BACCARAT, SALVAGE, ALIEM) */
                   <>
-                    {/* Top Promo Badge Overlay */}
                     <div className="absolute top-3 left-8 sm:top-5 sm:left-20 md:left-28 z-20 pointer-events-auto flex flex-col items-start gap-1">
                       <div className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-black/90 border border-[#C5A059]/70 text-[#C5A059] font-bold text-[9px] sm:text-xs shadow-2xl backdrop-blur-md">
                         {renderBadgeIcon(currentSlide.badgeIcon)}
@@ -401,7 +352,6 @@ export const Hero: React.FC<HeroProps> = ({
                       </div>
                     </div>
 
-                    {/* Floating Interactive CTA Button */}
                     <div className="absolute bottom-3 left-8 right-3 sm:left-20 md:left-28 sm:right-auto sm:bottom-6 z-20 flex flex-wrap items-center gap-2 pointer-events-auto">
                       <button
                         onClick={(e) => {
@@ -422,109 +372,137 @@ export const Hero: React.FC<HeroProps> = ({
                     </div>
                   </>
                 )}
-              </motion.div>
+              </div>
             ) : (
               /* BRAND EDITORIAL HERO (MAIN HERO & 5% OFF PIX) */
-              <motion.div
-                key={currentSlide.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.5, ease: 'easeOut' }}
-                className="space-y-5 max-w-4xl mx-auto px-4 text-center py-12 sm:py-16"
-              >
-                {/* Subtle Luxury Badge */}
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[#C5A059]/40 bg-black/70 backdrop-blur-md">
-                  {renderBadgeIcon(currentSlide.badgeIcon)}
-                  <span className="text-[10px] sm:text-[11px] font-sans tracking-[0.25em] uppercase text-neutral-200 font-light">
-                    {currentSlide.badge}
-                  </span>
+              <div className="relative w-full h-full flex flex-col items-center justify-center text-center px-4 py-8 overflow-hidden bg-[#0B0B0B]">
+                {/* Background Video */}
+                <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+                  <video
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    poster={heroImg}
+                    className="w-full h-full object-cover object-center opacity-30 scale-105"
+                  >
+                    <source
+                      src="https://assets.mixkit.co/videos/3141/3141-720.mp4"
+                      type="video/mp4"
+                    />
+                    <img 
+                      src={heroImg}
+                      alt="Perfumes Premium Swiss"
+                      className="w-full h-full object-cover object-center"
+                    />
+                  </video>
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0B] via-[#0B0B0B]/40 to-[#0B0B0B]/80" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#0B0B0B] via-[#0B0B0B]/20 to-[#0B0B0B]" />
                 </div>
 
-                {/* Main Slide Title */}
-                <h1 className="font-serif text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-normal tracking-wide text-white leading-[1.12] max-w-4xl mx-auto drop-shadow-[0_4px_30px_rgba(0,0,0,0.95)]">
-                  {currentSlide.title}{' '}
-                  {currentSlide.highlightText && (
-                    <span className="text-[#C5A059] italic font-serif underline decoration-[#C5A059]/40 decoration-2 underline-offset-4">
-                      {currentSlide.highlightText}
+                {/* Male / Female Models */}
+                <div className="absolute left-0 top-0 bottom-0 w-1/2 lg:w-[28%] z-1 pointer-events-none overflow-hidden opacity-30 sm:opacity-50 lg:opacity-100">
+                  <img src={maleModelGeneric} alt="Modelo Masculino" className="w-full h-full object-cover object-top" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#0B0B0B]/40 to-[#0B0B0B]" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0B] via-transparent to-[#0B0B0B]/80" />
+                </div>
+
+                <div className="absolute right-0 top-0 bottom-0 w-1/2 lg:w-[28%] z-1 pointer-events-none overflow-hidden opacity-30 sm:opacity-50 lg:opacity-100">
+                  <img src={femaleModelGeneric} alt="Modelo Feminino" className="w-full h-full object-cover object-top" />
+                  <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#0B0B0B]/40 to-[#0B0B0B]" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0B] via-transparent to-[#0B0B0B]/80" />
+                </div>
+
+                {/* Content */}
+                <div className="relative z-10 max-w-4xl mx-auto space-y-3 sm:space-y-4">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#C5A059]/40 bg-black/80 backdrop-blur-md">
+                    {renderBadgeIcon(currentSlide.badgeIcon)}
+                    <span className="text-[10px] sm:text-[11px] font-sans tracking-[0.2em] uppercase text-neutral-200 font-light">
+                      {currentSlide.badge}
                     </span>
-                  )}
-                </h1>
+                  </div>
 
-                {/* Subtitle & Tagline */}
-                <div className="space-y-3 max-w-2xl mx-auto">
-                  <p className="text-xs sm:text-base md:text-lg font-sans font-light tracking-wide text-neutral-200 leading-relaxed">
-                    {currentSlide.subtitle}
-                  </p>
-                  {currentSlide.tagline && (
-                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs sm:text-sm font-medium tracking-wider text-neutral-300">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
-                      <span>{currentSlide.tagline}</span>
-                    </div>
-                  )}
+                  <h1 className="font-serif text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-normal tracking-wide text-white leading-[1.12] drop-shadow-[0_4px_30px_rgba(0,0,0,0.95)]">
+                    {currentSlide.title}{' '}
+                    {currentSlide.highlightText && (
+                      <span className="text-[#C5A059] italic font-serif underline decoration-[#C5A059]/40 decoration-2 underline-offset-4">
+                        {currentSlide.highlightText}
+                      </span>
+                    )}
+                  </h1>
+
+                  <div className="space-y-2 max-w-2xl mx-auto">
+                    <p className="text-xs sm:text-base md:text-lg font-sans font-light tracking-wide text-neutral-200 leading-relaxed">
+                      {currentSlide.subtitle}
+                    </p>
+                    {currentSlide.tagline && (
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-neutral-300">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
+                        <span>{currentSlide.tagline}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
+                    <button
+                      onClick={() => handleCtaClick(currentSlide)}
+                      className="w-full sm:w-auto px-7 py-3 bg-white text-black hover:bg-[#C5A059] transition-all duration-300 text-xs sm:text-sm font-bold tracking-[0.2em] uppercase flex items-center justify-center gap-2 shadow-2xl cursor-pointer group"
+                    >
+                      <span>{currentSlide.ctaText}</span>
+                      <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+                    </button>
+
+                    {currentSlide.id === 'main_hero' && (
+                      <button
+                        onClick={onOpenWhatsApp}
+                        className="text-xs sm:text-sm text-neutral-300 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer font-light tracking-wider py-2"
+                      >
+                        <MessageCircle className="w-4 h-4 text-emerald-400" />
+                        <span>Falar no WhatsApp</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
-
-                {/* CTAs */}
-                <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
-                  <button
-                    onClick={() => handleCtaClick(currentSlide)}
-                    className="w-full sm:w-auto px-8 py-3.5 bg-white text-black hover:bg-[#C5A059] transition-all duration-300 rounded-none text-xs sm:text-sm font-bold tracking-[0.2em] uppercase flex items-center justify-center gap-2.5 shadow-2xl cursor-pointer group"
-                  >
-                    <span>{currentSlide.ctaText}</span>
-                    <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
-                  </button>
-
-                  <button
-                    onClick={onOpenWhatsApp}
-                    className="text-xs sm:text-sm text-neutral-300 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer font-light tracking-wider py-2"
-                  >
-                    <MessageCircle className="w-4 h-4 text-emerald-400" />
-                    <span>Falar no WhatsApp</span>
-                  </button>
-                </div>
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
-        </div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
-        {/* Trust Indicators Bar */}
-        <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-3 text-left border-t border-white/10 pt-3 max-w-3xl mx-auto opacity-90 px-4">
-          <div className="flex items-center gap-2.5">
-            <Sparkles className="w-3.5 h-3.5 text-[#C5A059] shrink-0" />
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-white">36% Concentração</p>
-              <p className="text-[10px] text-neutral-400 font-light">Extrait de Parfum</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#C5A059] shrink-0" />
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-white">Fixação Estimada</p>
-              <p className="text-[10px] text-neutral-400 font-light">8h a 12h na pele</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <Award className="w-3.5 h-3.5 text-[#C5A059] shrink-0" />
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-white">Essências Importadas</p>
-              <p className="text-[10px] text-neutral-400 font-light">Perfumaria Internacional</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <MessageCircle className="w-3.5 h-3.5 text-[#C5A059] shrink-0" />
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-white">Atendimento Humano</p>
-              <p className="text-[10px] text-neutral-400 font-light">Consultoria no WhatsApp</p>
-            </div>
+      {/* Trust Indicators Bar */}
+      <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-left border-t border-white/10 pt-3 max-w-3xl mx-auto opacity-90 px-4 pb-1">
+        <div className="flex items-center gap-2.5">
+          <Sparkles className="w-3.5 h-3.5 text-[#C5A059] shrink-0" />
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-white">36% Concentração</p>
+            <p className="text-[10px] text-neutral-400 font-light">Extrait de Parfum</p>
           </div>
         </div>
 
+        <div className="flex items-center gap-2.5">
+          <ShieldCheck className="w-3.5 h-3.5 text-[#C5A059] shrink-0" />
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-white">Fixação Estimada</p>
+            <p className="text-[10px] text-neutral-400 font-light">8h a 12h na pele</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <Award className="w-3.5 h-3.5 text-[#C5A059] shrink-0" />
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-white">Essências Importadas</p>
+            <p className="text-[10px] text-neutral-400 font-light">Perfumaria Internacional</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <MessageCircle className="w-3.5 h-3.5 text-[#C5A059] shrink-0" />
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-white">Atendimento Humano</p>
+            <p className="text-[10px] text-neutral-400 font-light">Consultoria no WhatsApp</p>
+          </div>
+        </div>
       </div>
     </section>
   );
 };
-
-
