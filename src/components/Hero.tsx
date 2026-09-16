@@ -205,7 +205,7 @@ export const Hero: React.FC<HeroProps> = ({
 
   return (
     <section 
-      className={`relative flex items-center justify-center bg-[#0B0B0B] text-white overflow-hidden pt-16 sm:pt-20 pb-2 sm:pb-4 select-none ${currentSlide.imageUrl ? 'min-h-[260px] sm:min-h-[400px] lg:min-h-[550px]' : 'min-h-[75vh] lg:min-h-[85vh]'}`}
+      className="relative flex flex-col items-center justify-center bg-[#0B0B0B] text-white overflow-hidden pt-0 pb-3 sm:pb-5 select-none w-full"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
@@ -283,7 +283,7 @@ export const Hero: React.FC<HeroProps> = ({
       )}
 
       {/* CAROUSEL CONTAINER */}
-      <div className={`relative z-10 w-full flex flex-col justify-between ${currentSlide.imageUrl ? 'h-auto' : 'min-h-[70vh] lg:min-h-[80vh]'}`}>
+      <div className={`relative z-10 w-full flex flex-col justify-between pt-0 ${currentSlide.imageUrl ? 'h-auto' : 'min-h-[60vh] sm:min-h-[70vh] lg:min-h-[80vh] py-8'}`}>
 
         {/* Slide Content Area */}
         <div className="w-full flex-1 flex items-center justify-center relative">
@@ -487,44 +487,8 @@ export const Hero: React.FC<HeroProps> = ({
           </AnimatePresence>
         </div>
 
-        {/* Bottom Carousel Controls (Indicators) */}
-        <div className="relative z-20 pt-5 pb-2 flex items-center justify-center gap-4">
-          <button
-            onClick={handlePrev}
-            aria-label="Anterior"
-            className="w-8 h-8 rounded-full bg-black/60 border border-white/20 text-white hover:bg-[#C5A059] hover:text-black transition-all flex items-center justify-center cursor-pointer shadow-md"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-
-          <div className="flex items-center gap-2">
-            {slides.map((s, idx) => (
-              <button
-                key={s.id}
-                onClick={() => setCurrentIndex(idx)}
-                aria-label={`Slide ${idx + 1}`}
-                className="group relative py-2 cursor-pointer"
-              >
-                <div className={`h-2 rounded-full transition-all duration-500 ${
-                  idx === currentIndex
-                    ? 'w-9 bg-[#C5A059] shadow-[0_0_12px_rgba(197,160,89,0.9)]'
-                    : 'w-2.5 bg-white/30 hover:bg-white/60'
-                }`} />
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={handleNext}
-            aria-label="Próximo"
-            className="w-8 h-8 rounded-full bg-black/60 border border-white/20 text-white hover:bg-[#C5A059] hover:text-black transition-all flex items-center justify-center cursor-pointer shadow-md"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-
         {/* Trust Indicators Bar */}
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-left border-t border-white/10 pt-4 max-w-3xl mx-auto opacity-90">
+        <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-3 text-left border-t border-white/10 pt-3 max-w-3xl mx-auto opacity-90 px-4">
           <div className="flex items-center gap-2.5">
             <Sparkles className="w-3.5 h-3.5 text-[#C5A059] shrink-0" />
             <div>
