@@ -471,9 +471,17 @@ function applyUpdateToProduct(rawId: string, payload: any): boolean {
 
 // Authentication helper for administrative endpoints
 function verifyAdminAuth(req: any, res: any): boolean {
+  const expectedKey = process.env.ADMIN_API_KEY;
+  if (!expectedKey) {
+    res.status(500).json({
+      success: false,
+      error: 'ADMIN_API_KEY_NOT_CONFIGURED',
+      message: 'A variável de ambiente ADMIN_API_KEY não está configurada no servidor.'
+    });
+    return false;
+  }
   const apiKey = req.headers['x-admin-api-key'] || req.headers['x-api-key'] || req.query?.apiKey;
   const authHeader = req.headers.authorization;
-  const expectedKey = process.env.ADMIN_API_KEY || 'swiss-admin-key-2025';
 
   if (apiKey === expectedKey || (authHeader && authHeader.includes(expectedKey))) {
     return true;
@@ -766,16 +774,16 @@ app.post('/api/reviews', async (req, res) => {
       });
     }
 
-    // Verify payment status
-    const validStatuses = ['pago', 'em_preparo', 'enviado', 'entregue'];
+    // Verify payment status (allow concluded/delivered or confirmed orders)
+    const validStatuses = ['pago', 'em_preparo', 'enviado', 'entregue', 'concluido'];
     if (!validStatuses.includes(foundOrder.status)) {
       return res.status(400).json({
         success: false,
-        message: 'Sua avaliação só pode ser publicada após a confirmação do pagamento do pedido.'
+        message: 'Sua avaliação só pode ser publicada após a confirmação/entrega do pedido.'
       });
     }
 
-    // Save review to Firestore
+    // Save review to Firestore with associated items for product matching
     const reviewId = `rev_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const reviewDocRef = doc(firestoreDb, 'reviews', reviewId);
 
@@ -788,6 +796,7 @@ app.post('/api/reviews', async (req, res) => {
       customerCity: foundOrder.customer?.city || '',
       customerState: foundOrder.customer?.state || '',
       photoUrl: photoUrl || '',
+      items: foundOrder.items || [],
       status: 'approved',
       createdAt: new Date().toISOString()
     };
@@ -827,54 +836,104 @@ app.get('/api/reviews', async (req, res) => {
 // ==========================================
 // SERVER-SIDE PRICE VALIDATION & RECALCULATION
 // ==========================================
-function getItemRealPrice(item: any): number {
-  const rawId = item.productId || item.id || item.product?.id || item.name;
-  const size = String(item.size || item.selectedSize || '100ml').toLowerCase().trim();
-  const name = String(item.name || item.product?.name || '').toLowerCase();
-
-  // Check for Trio/Kit
-  if (String(rawId).toLowerCase().startsWith('trio-') || name.includes('trio') || name.includes('3x 15ml')) {
-    return 89.90;
+function getItemRealPrice(item: any): { valid: boolean; price: number; error?: string } {
+  if (!item || typeof item !== 'object') {
+    return { valid: false, price: 0, error: 'Item do pedido ausente ou inválido.' };
   }
 
-  if (size.includes('15ml') || size === '15') {
-    return 35.00;
-  }
-  if (size.includes('55ml') || size === '55') {
-    return 80.00;
-  }
-  if (size.includes('100ml') || size === '100') {
-    return 130.00;
+  const rawId = item.productId || item.id || item.product?.id;
+  if (!rawId) {
+    return { valid: false, price: 0, error: 'Cada item deve ter um productId válido.' };
   }
 
-  const prod = PRODUCTS.find(p => p.id === rawId || resolveProductKey(rawId) === p.id);
-  if (prod && typeof prod.price === 'number' && prod.price > 0) {
-    return prod.price;
+  const rawIdStr = String(rawId).toLowerCase().trim();
+
+  // Special Kit/Trio offer
+  if (rawIdStr.startsWith('trio-') || rawIdStr === 'trio-kit' || rawIdStr === 'trio-15ml') {
+    return { valid: true, price: 89.90 };
   }
 
-  return 130.00;
+  // Lookup product in official catalog strictly by productId
+  const prod = PRODUCTS.find(p => p.id === rawId || p.id === rawIdStr || resolveProductKey(rawIdStr) === p.id);
+  if (!prod) {
+    return { valid: false, price: 0, error: `Produto com ID '${rawId}' não foi encontrado no catálogo oficial.` };
+  }
+
+  // Extract size and determine real price from catalog definition
+  const sizeRaw = String(item.size || item.selectedSize || item.volume || '').toLowerCase().trim();
+
+  if (sizeRaw.includes('15ml') || sizeRaw === '15') {
+    return { valid: true, price: 35.00 };
+  }
+  if (sizeRaw.includes('55ml') || sizeRaw === '55') {
+    return { valid: true, price: 80.00 };
+  }
+  if (sizeRaw.includes('100ml') || sizeRaw === '100') {
+    const catalogPrice = typeof prod.price === 'number' && prod.price > 0 ? prod.price : 130.00;
+    return { valid: true, price: catalogPrice };
+  }
+
+  return {
+    valid: false,
+    price: 0,
+    error: `Tamanho '${item.size || sizeRaw}' inválido para o produto '${prod.name}'. Tamanhos aceitos: 15ml, 55ml, 100ml.`
+  };
 }
 
-function calculateRealOrderTotal(items: any[], paymentMethod: string, clientFreight: number = 0): { subtotal: number; freight: number; discount: number; total: number } {
+function calculateRealOrderTotal(
+  items: any[],
+  paymentMethod: string,
+  clientFreight: number = 0
+): { valid: boolean; error?: string; subtotal: number; freight: number; discount: number; total: number } {
   if (!Array.isArray(items) || items.length === 0) {
-    return { subtotal: 0, freight: 0, discount: 0, total: 0 };
+    return {
+      valid: false,
+      error: 'A lista de itens (items) é obrigatória e não pode estar vazia.',
+      subtotal: 0,
+      freight: 0,
+      discount: 0,
+      total: 0
+    };
   }
 
   let subtotal = 0;
-  items.forEach((item) => {
-    const realPrice = getItemRealPrice(item);
-    const quantity = Math.max(1, Math.floor(Number(item.quantity || 1)));
-    subtotal += realPrice * quantity;
-  });
+  for (const item of items) {
+    const itemCalc = getItemRealPrice(item);
+    if (!itemCalc.valid) {
+      return {
+        valid: false,
+        error: itemCalc.error,
+        subtotal: 0,
+        freight: 0,
+        discount: 0,
+        total: 0
+      };
+    }
 
+    const quantity = Math.max(1, Math.floor(Number(item.quantity || 1)));
+    if (isNaN(quantity) || quantity <= 0) {
+      return {
+        valid: false,
+        error: 'Quantidade de item inválida.',
+        subtotal: 0,
+        freight: 0,
+        discount: 0,
+        total: 0
+      };
+    }
+
+    subtotal += itemCalc.price * quantity;
+  }
+
+  subtotal = Number(subtotal.toFixed(2));
   const freight = subtotal >= 250.00 ? 0 : Math.max(0, Number(clientFreight) || 0);
   const discount = paymentMethod === 'pix' ? Number((subtotal * 0.05).toFixed(2)) : 0;
   const total = Number(Math.max(0, subtotal + freight - discount).toFixed(2));
 
-  return { subtotal, freight, discount, total };
+  return { valid: true, subtotal, freight, discount, total };
 }
 
-// 1. Create PIX Payment (supports /api/mercadopago/create-pix and /mercadopago/create-pix)
+// 1. Create PIX Payment
 const handleCreatePix = async (req: express.Request, res: express.Response) => {
   try {
     const client = getMercadoPagoClient();
@@ -885,23 +944,31 @@ const handleCreatePix = async (req: express.Request, res: express.Response) => {
       });
     }
 
-    const { items, transaction_amount, description, payer, freightCost } = req.body;
+    const { items, description, payer, freightCost } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        error: 'INVALID_ORDER_ITEMS',
+        message: 'A requisição de pagamento PIX deve obrigatoriamente conter o array "items".'
+      });
+    }
 
     if (!payer || !payer.email) {
-      return res.status(400).json({ error: 'Parâmetros obrigatórios ausentes.' });
+      return res.status(400).json({ error: 'Parâmetros obrigatórios ausentes (dados do pagador).' });
     }
 
-    // Recalculate real total on server side
-    let realAmount = Number(transaction_amount);
-    if (Array.isArray(items) && items.length > 0) {
-      const recalculated = calculateRealOrderTotal(items, 'pix', freightCost);
-      if (recalculated.total > 0) {
-        realAmount = recalculated.total;
-      }
+    // Recalculate real total strictly on server side from official catalog prices
+    const recalculated = calculateRealOrderTotal(items, 'pix', freightCost);
+    if (!recalculated.valid) {
+      return res.status(400).json({
+        error: 'INVALID_ORDER_ITEMS',
+        message: recalculated.error
+      });
     }
 
+    const realAmount = recalculated.total;
     if (!realAmount || realAmount <= 0) {
-      return res.status(400).json({ error: 'Valor da transação inválido.' });
+      return res.status(400).json({ error: 'INVALID_TRANSACTION_AMOUNT', message: 'Valor recalculado do pedido é inválido.' });
     }
 
     const payment = new Payment(client);
@@ -935,7 +1002,6 @@ const handleCreatePix = async (req: express.Request, res: express.Response) => {
     } catch (err: any) {
       const errMsg = String(err?.message || err?.cause || JSON.stringify(err) || '');
       console.warn('[MercadoPago PIX warning]:', errMsg);
-      // If error is caused by invalid identification number, try creating without identification
       if (errMsg.toLowerCase().includes('identification') || errMsg.toLowerCase().includes('user identification')) {
         try {
           const bodyWithoutId = { ...body, payer: { ...payerData } };
@@ -993,20 +1059,31 @@ const handleProcessCard = async (req: express.Request, res: express.Response) =>
       payment_method_id,
       issuer_id,
       installments,
-      transaction_amount,
       description,
       payer,
       orderId,
       freightCost
     } = req.body;
 
-    // Recalculate real card transaction amount on server
-    let realAmount = Number(transaction_amount);
-    if (Array.isArray(items) && items.length > 0) {
-      const recalculated = calculateRealOrderTotal(items, 'credit_card', freightCost);
-      if (recalculated.total > 0) {
-        realAmount = recalculated.total;
-      }
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        error: 'INVALID_ORDER_ITEMS',
+        message: 'A requisição de pagamento por cartão deve obrigatoriamente conter o array "items".'
+      });
+    }
+
+    // Recalculate real card transaction amount strictly on server side from official catalog prices
+    const recalculated = calculateRealOrderTotal(items, 'credit_card', freightCost);
+    if (!recalculated.valid) {
+      return res.status(400).json({
+        error: 'INVALID_ORDER_ITEMS',
+        message: recalculated.error
+      });
+    }
+
+    const realAmount = recalculated.total;
+    if (!realAmount || realAmount <= 0) {
+      return res.status(400).json({ error: 'INVALID_TRANSACTION_AMOUNT', message: 'Valor recalculado do pedido é inválido.' });
     }
 
     if (!token) {

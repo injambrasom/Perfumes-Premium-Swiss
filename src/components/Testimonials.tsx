@@ -16,7 +16,6 @@ interface RealReview {
 }
 
 export const Testimonials: React.FC = () => {
-  const [satisfiedClientsCount] = useState('5.240');
   const [selectedImage, setSelectedImage] = useState<RealFeedbackPrint | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [isZoomed, setIsZoomed] = useState<boolean>(false);
@@ -26,6 +25,11 @@ export const Testimonials: React.FC = () => {
   // Real Reviews State from Firestore / API
   const [reviews, setReviews] = useState<RealReview[]>([]);
   const [showReviewModal, setShowReviewModal] = useState(false);
+
+  const satisfiedClientsCount = '5.240';
+  const totalReviewsCount = reviews.length > 0 
+    ? (5240 + reviews.length).toLocaleString('pt-BR') 
+    : satisfiedClientsCount;
   const [orderIdInput, setOrderIdInput] = useState('');
   const [ratingInput, setRatingInput] = useState(5);
   const [commentInput, setCommentInput] = useState('');
@@ -160,7 +164,7 @@ export const Testimonials: React.FC = () => {
           </div>
 
           <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-normal tracking-tight text-white">
-            Mais de <span className="underline decoration-[#C5A059]">{satisfiedClientsCount}</span> Clientes Satisfeitos
+            Mais de <span className="underline decoration-[#C5A059]">{totalReviewsCount}</span> Clientes Satisfeitos
           </h2>
           <p className="mt-3 text-xs sm:text-sm text-neutral-300 font-light max-w-xl mx-auto leading-relaxed">
             Confira abaixo os depoimentos reais enviados por clientes que adquiriram seus perfumes Swiss e os prints de atendimento no WhatsApp.

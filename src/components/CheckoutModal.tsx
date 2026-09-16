@@ -736,7 +736,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         const expMonth = parseInt(expParts[0] ? expParts[0].trim() : '12', 10);
         const expYearRaw = expParts[1] ? expParts[1].trim() : '28';
         const expYear = parseInt(expYearRaw.length === 2 ? `20${expYearRaw}` : expYearRaw, 10);
-        const publicKey = import.meta.env.VITE_MERCADO_PAGO_PUBLIC_KEY || 'APP_USR-7e44a0e1-4c6c-4861-9c88-66df5bb4f8fb';
+        const publicKey = mpPublicKey || import.meta.env.VITE_MERCADO_PAGO_PUBLIC_KEY;
+        if (!publicKey) {
+          setMpError('A chave pública do Mercado Pago (VITE_MERCADO_PAGO_PUBLIC_KEY) não está configurada no servidor ou ambiente.');
+          setStep('form');
+          return;
+        }
 
         // 1. Generate card token in browser via MP Public Key (Raw card numbers never reach our backend server)
         const tokenRes = await fetch(`https://api.mercadopago.com/v1/card_tokens?public_key=${publicKey}`, {

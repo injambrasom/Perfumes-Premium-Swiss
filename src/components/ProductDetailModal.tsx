@@ -21,6 +21,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 }) => {
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState<BottleSize>('100ml');
+  const [realReviews, setRealReviews] = useState<any[]>([]);
 
   useEffect(() => {
     if (product) {
@@ -34,10 +35,36 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           setSelectedSize('15ml');
         }
       }
+
+      // Fetch Firestore real reviews to calculate dynamic product rating
+      fetch('/api/reviews')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.reviews)) {
+            const matches = data.reviews.filter((r: any) => {
+              if (r.productId === product.id) return true;
+              if (Array.isArray(r.items)) {
+                return r.items.some((i: any) => (i.productId || i.id) === product.id || String(i.name || '').toLowerCase() === product.name.toLowerCase());
+              }
+              return false;
+            });
+            setRealReviews(matches);
+          }
+        })
+        .catch(() => {});
     }
   }, [product]);
 
   if (!product) return null;
+
+  // Calculate rating & review count based on real Firestore reviews if present
+  const hasRealProductReviews = realReviews.length > 0;
+  const computedRating = hasRealProductReviews
+    ? Number((realReviews.reduce((sum, r) => sum + (r.rating || 5), 0) / realReviews.length).toFixed(1))
+    : product.rating;
+  const computedReviewsCount = hasRealProductReviews
+    ? realReviews.length
+    : product.reviewsCount;
 
   const currentOption = BOTTLE_OPTIONS.find((b) => b.size === selectedSize) || BOTTLE_OPTIONS[2];
   const unitPrice = currentOption.price;
@@ -137,8 +164,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </span>
                   <div className="flex items-center gap-1.5 text-[#F0D590] bg-black/50 px-2.5 py-1 rounded-full border border-[#C5A059]/30">
                     <Star className="w-3.5 h-3.5 fill-current text-[#C5A059]" />
-                    <span className="font-bold text-white">{product.rating}</span>
-                    <span className="text-neutral-400 text-[11px]">({product.reviewsCount})</span>
+                    <span className="font-bold text-white">{computedRating}</span>
+                    <span className="text-neutral-400 text-[11px]">({computedReviewsCount})</span>
                   </div>
                 </div>
 
