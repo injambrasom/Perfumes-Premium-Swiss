@@ -19,17 +19,38 @@ import {
   onValue as rtdbOnValue,
   set as rtdbSet
 } from 'firebase/database';
-const firebaseConfig = {
-  projectId: "gen-lang-client-0216852920",
-  appId: "1:905476022886:web:94f171a6670c3eef4e03a7",
-  apiKey: "AIzaSyCUrY0l_r3_rwU4zlAmu9F0frBK3AUsewM",
-  authDomain: "gen-lang-client-0216852920.firebaseapp.com",
-  firestoreDatabaseId: "ai-studio-79c8f0b3-973d-460a-a7bd-65f19a2fa2e1",
-  storageBucket: "gen-lang-client-0216852920.firebasestorage.app",
-  messagingSenderId: "905476022886",
-  measurementId: "",
-  recaptchaSiteKey: ""
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  User
+} from 'firebase/auth';
+
+import appletConfig from '../../firebase-applet-config.json';
+
+// Read config from environment variables with fallback to firebase-applet-config.json
+const getFirebaseConfig = () => {
+  const apiKey = import.meta.env.VITE_FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || appletConfig.apiKey;
+  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || appletConfig.projectId || 'gen-lang-client-0216852920';
+
+  if (!apiKey) {
+    console.warn('[FIREBASE]: VITE_FIREBASE_API_KEY não definida nas variáveis de ambiente.');
+  }
+
+  return {
+    apiKey: apiKey,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || appletConfig.authDomain || `${projectId}.firebaseapp.com`,
+    projectId: projectId,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || appletConfig.storageBucket || `${projectId}.firebasestorage.app`,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || appletConfig.messagingSenderId || '',
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || appletConfig.appId || '',
+    firestoreDatabaseId: import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || appletConfig.firestoreDatabaseId || 'ai-studio-79c8f0b3-973d-460a-a7bd-65f19a2fa2e1'
+  };
 };
+
+const firebaseConfig = getFirebaseConfig();
+
 import { INITIAL_INVENTORY, ProductStockData } from '../data/inventory';
 import { Order, OrderStatus } from '../types';
 import {
@@ -50,6 +71,46 @@ const app = getApps().length === 0
       databaseURL: `https://${firebaseConfig.projectId}-default-rtdb.firebaseio.com`
     })
   : getApps()[0];
+
+// Export Auth instance
+export const auth = getAuth(app);
+
+/**
+ * Authenticates admin via Firebase Auth (Email/Password)
+ */
+export async function loginAdminWithFirebase(email: string, pass: string): Promise<User> {
+  const credential = await signInWithEmailAndPassword(auth, email, pass);
+  const user = credential.user;
+
+  try {
+    const adminDocRef = doc(db, 'admins', user.uid);
+    const adminDocSnap = await getDoc(adminDocRef);
+    const tokenResult = await user.getIdTokenResult();
+
+    const isExplicitAdmin = adminDocSnap.exists() || !!tokenResult.claims?.admin;
+
+    // Allow access if explicit admin or if it's the primary configured admin email
+    if (!isExplicitAdmin && user.email !== 'admin@swiss.com' && !user.email?.endsWith('@swiss.com')) {
+      await firebaseSignOut(auth);
+      throw new Error('Acesso negado: Este e-mail não possui privilégios de administrador.');
+    }
+  } catch (err: any) {
+    if (err.message.includes('Acesso negado')) {
+      throw err;
+    }
+    // If firestore check fails due to rules, fallback to checking email
+    if (!user.email?.endsWith('@swiss.com') && user.email !== 'admin@swiss.com') {
+      await firebaseSignOut(auth);
+      throw new Error('Acesso negado: Usuário sem privilégios administrativos.');
+    }
+  }
+
+  return user;
+}
+
+export async function logoutAdmin(): Promise<void> {
+  await firebaseSignOut(auth);
+}
 
 // The primary target Firestore Database ID from the stock app URL
 export const stockAppDbId = 'ai-studio-79c8f0b3-973d-460a-a7bd-65f19a2fa2e1';

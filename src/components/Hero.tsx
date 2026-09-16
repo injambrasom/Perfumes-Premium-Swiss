@@ -32,7 +32,7 @@ interface HeroSlide {
 
 const slideVariants = {
   enter: (dir: number) => ({
-    x: dir > 0 ? '100%' : '-100%',
+    x: dir > 0 ? '60%' : '-60%',
     opacity: 0,
   }),
   center: {
@@ -42,7 +42,7 @@ const slideVariants = {
   },
   exit: (dir: number) => ({
     zIndex: 0,
-    x: dir < 0 ? '100%' : '-100%',
+    x: dir < 0 ? '60%' : '-60%',
     opacity: 0,
   }),
 };
@@ -259,8 +259,8 @@ export const Hero: React.FC<HeroProps> = ({
             animate="center"
             exit="exit"
             transition={{
-              x: { type: "spring", stiffness: 280, damping: 30 },
-              opacity: { duration: 0.25 }
+              x: { duration: 0.55, ease: [0.25, 0.1, 0.25, 1] },
+              opacity: { duration: 0.45, ease: "easeInOut" }
             }}
             className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden"
           >

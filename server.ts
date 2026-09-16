@@ -5,41 +5,77 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import { MercadoPagoConfig, Payment, Preference } from 'mercadopago';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { PRODUCTS, REFERENCE_PERFUMES_LIST } from './src/data/products';
 
 dotenv.config();
 
 const __dirname = path.resolve();
 
-// Fallback Firebase Configuration
-const FALLBACK_FIREBASE_CONFIG = {
-  projectId: "gen-lang-client-0216852920",
-  appId: "1:905476022886:web:94f171a6670c3eef4e03a7",
-  apiKey: "AIzaSyCUrY0l_r3_rwU4zlAmu9F0frBK3AUsewM",
-  authDomain: "gen-lang-client-0216852920.firebaseapp.com",
-  firestoreDatabaseId: "ai-studio-79c8f0b3-973d-460a-a7bd-65f19a2fa2e1",
-  storageBucket: "gen-lang-client-0216852920.firebasestorage.app",
-  messagingSenderId: "905476022886"
-};
-
 // Initialize Firestore for server-side order updates in Webhook & inventory deduction
 let firestoreDb: any = null;
 try {
   const configPath = path.join(__dirname, 'firebase-applet-config.json');
-  let firebaseConfig = FALLBACK_FIREBASE_CONFIG;
+  let firebaseConfig: any = {
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || 'gen-lang-client-0216852920',
+    apiKey: process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || '',
+    appId: process.env.VITE_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID || '',
+    authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN || '',
+    firestoreDatabaseId: process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.FIREBASE_FIRESTORE_DATABASE_ID || 'ai-studio-79c8f0b3-973d-460a-a7bd-65f19a2fa2e1',
+    storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || '',
+    messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || ''
+  };
+
   if (fs.existsSync(configPath)) {
     try {
-      firebaseConfig = { ...FALLBACK_FIREBASE_CONFIG, ...JSON.parse(fs.readFileSync(configPath, 'utf-8')) };
+      const fileConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      firebaseConfig = { ...firebaseConfig, ...fileConfig };
     } catch {
       // ignore
     }
   }
-  const firebaseApp = initializeApp(firebaseConfig);
-  firestoreDb = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || FALLBACK_FIREBASE_CONFIG.firestoreDatabaseId);
-  console.log('[FIREBASE SERVER] Firestore connected successfully for webhooks and inventory management');
+
+  if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+    const firebaseApp = initializeApp(firebaseConfig);
+    firestoreDb = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || 'ai-studio-79c8f0b3-973d-460a-a7bd-65f19a2fa2e1');
+    console.log('[FIREBASE SERVER] Firestore conectado com sucesso no backend');
+    loadInventoryFromFirestore();
+  } else {
+    console.warn('[FIREBASE SERVER] Variáveis de ambiente do Firebase ausentes no servidor backend.');
+  }
 } catch (err) {
-  console.warn('[FIREBASE SERVER] Firestore initialization warning:', err);
+  console.warn('[FIREBASE SERVER] Aviso na inicialização do Firestore:', err);
+}
+
+// Persistent Inventory Firestore Handlers
+async function loadInventoryFromFirestore() {
+  if (!firestoreDb) return;
+  try {
+    const masterDocRef = doc(firestoreDb, 'inventory', 'master_store');
+    const masterSnap = await getDoc(masterDocRef);
+    if (masterSnap.exists()) {
+      const data = masterSnap.data();
+      if (data && data.store && typeof data.store === 'object') {
+        Object.assign(INVENTORY_STORE, data.store);
+        console.log('✅ [FIRESTORE INVENTORY]: Estoque carregado do Firestore com sucesso (fonte da verdade).');
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ [FIRESTORE INVENTORY]: Não foi possível carregar estoque do Firestore:', err);
+  }
+}
+
+async function syncInventoryToFirestore() {
+  if (!firestoreDb) return;
+  try {
+    const masterDocRef = doc(firestoreDb, 'inventory', 'master_store');
+    await setDoc(masterDocRef, {
+      store: INVENTORY_STORE,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+  } catch (err) {
+    console.error('❌ [FIRESTORE INVENTORY]: Erro ao salvar estoque no Firestore:', err);
+  }
 }
 
 // ==========================================
@@ -123,14 +159,6 @@ const handlePublicKey = (req: express.Request, res: express.Response) => {
 
 app.get('/api/mercadopago/public-key', handlePublicKey);
 app.get('/mercadopago/public-key', handlePublicKey);
-
-// Health Check Endpoint for deployment validation
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true });
-});
-app.get('/health', (req, res) => {
-  res.json({ ok: true });
-});
 
 // ==========================================
 // INTEGRATED STOCK & INVENTORY API ENDPOINTS
@@ -435,9 +463,28 @@ function applyUpdateToProduct(rawId: string, payload: any): boolean {
       productName: prod?.name || rawId,
       stock: { ...INVENTORY_STORE[resolvedKey] }
     };
+    syncInventoryToFirestore();
   }
 
   return updated;
+}
+
+// Authentication helper for administrative endpoints
+function verifyAdminAuth(req: any, res: any): boolean {
+  const apiKey = req.headers['x-admin-api-key'] || req.headers['x-api-key'] || req.query?.apiKey;
+  const authHeader = req.headers.authorization;
+  const expectedKey = process.env.ADMIN_API_KEY || 'swiss-admin-key-2025';
+
+  if (apiKey === expectedKey || (authHeader && authHeader.includes(expectedKey))) {
+    return true;
+  }
+
+  res.status(401).json({
+    success: false,
+    error: 'UNAUTHORIZED',
+    message: 'Acesso não autorizado. Chave de API de administração inválida ou ausente (header X-Admin-API-Key).'
+  });
+  return false;
 }
 
 // Master handler for all stock / inventory requests (GET, POST, PUT, PATCH)
@@ -445,10 +492,17 @@ function handleGenericInventoryUpdate(req: any, res: any) {
   // Set explicit CORS headers for cross-origin POST requests from Stock Manager
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS, PUT, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, X-Admin-API-Key');
 
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
+  }
+
+  // Protect state-modifying requests with API Key
+  if (req.method !== 'GET') {
+    if (!verifyAdminAuth(req, res)) {
+      return;
+    }
   }
 
   console.log(`[INVENTORY REQUEST ${req.method} ${req.path}]:`, {
@@ -594,7 +648,8 @@ const updateRoutes = [
   '/api/estoque/:id',
   '/api/products/stock',
   '/api/products/:id/stock',
-  '/api/products/:id'
+  '/api/products/:id',
+  '/api/inventory/reset'
 ];
 
 updateRoutes.forEach(route => {
@@ -655,6 +710,8 @@ app.post('/api/inventory/deduct', async (req, res) => {
     }
   }
 
+  syncInventoryToFirestore();
+
   res.json({
     success: true,
     message: 'Estoque atualizado e sincronizado com Sucesso!',
@@ -662,6 +719,160 @@ app.post('/api/inventory/deduct', async (req, res) => {
     currentInventory: INVENTORY_STORE
   });
 });
+
+// ==========================================
+// REVIEWS & FEEDBACK API ENDPOINTS
+// ==========================================
+app.post('/api/reviews', async (req, res) => {
+  const { orderId, rating, comment, customerName, photoUrl } = req.body || {};
+
+  if (!orderId || !comment || !rating) {
+    return res.status(400).json({
+      success: false,
+      message: 'Por favor, informe o número do pedido, nota (1 a 5) e o seu comentário.'
+    });
+  }
+
+  const cleanOrderId = orderId.toString().trim().replace(/^#/, '');
+
+  if (!firestoreDb) {
+    return res.status(500).json({
+      success: false,
+      message: 'Banco de dados temporariamente indisponível. Tente novamente em instantes.'
+    });
+  }
+
+  try {
+    // Search order by ID or orderNumber
+    let foundOrder: any = null;
+    const orderDocRef = doc(firestoreDb, 'orders', cleanOrderId);
+    const orderSnap = await getDoc(orderDocRef);
+
+    if (orderSnap.exists()) {
+      foundOrder = orderSnap.data();
+    } else {
+      const ordersCol = collection(firestoreDb, 'orders');
+      const q = query(ordersCol, where('orderNumber', '==', cleanOrderId));
+      const qSnap = await getDocs(q);
+      if (!qSnap.empty) {
+        foundOrder = qSnap.docs[0].data();
+      }
+    }
+
+    if (!foundOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'Pedido não encontrado no sistema. Verifique se o código do pedido está correto (ex: SWISS-1234).'
+      });
+    }
+
+    // Verify payment status
+    const validStatuses = ['pago', 'em_preparo', 'enviado', 'entregue'];
+    if (!validStatuses.includes(foundOrder.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Sua avaliação só pode ser publicada após a confirmação do pagamento do pedido.'
+      });
+    }
+
+    // Save review to Firestore
+    const reviewId = `rev_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const reviewDocRef = doc(firestoreDb, 'reviews', reviewId);
+
+    const reviewData = {
+      id: reviewId,
+      orderId: cleanOrderId,
+      rating: Math.min(5, Math.max(1, Number(rating))),
+      comment: comment.toString().trim(),
+      customerName: customerName || foundOrder.customer?.name || 'Cliente Verificado',
+      customerCity: foundOrder.customer?.city || '',
+      customerState: foundOrder.customer?.state || '',
+      photoUrl: photoUrl || '',
+      status: 'approved',
+      createdAt: new Date().toISOString()
+    };
+
+    await setDoc(reviewDocRef, reviewData);
+
+    return res.json({
+      success: true,
+      message: 'Sua avaliação foi verificada e enviada com sucesso! Muito obrigado pelo feedback.',
+      review: reviewData
+    });
+  } catch (err: any) {
+    console.error('[REVIEWS API ERROR]:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Ocorreu um erro interno ao registrar a avaliação. Tente novamente.'
+    });
+  }
+});
+
+app.get('/api/reviews', async (req, res) => {
+  if (!firestoreDb) {
+    return res.json({ success: true, reviews: [] });
+  }
+
+  try {
+    const reviewsCol = collection(firestoreDb, 'reviews');
+    const qSnap = await getDocs(reviewsCol);
+    const reviews = qSnap.docs.map(doc => doc.data());
+    return res.json({ success: true, reviews });
+  } catch (err) {
+    console.error('[GET REVIEWS ERROR]:', err);
+    return res.json({ success: true, reviews: [] });
+  }
+});
+
+// ==========================================
+// SERVER-SIDE PRICE VALIDATION & RECALCULATION
+// ==========================================
+function getItemRealPrice(item: any): number {
+  const rawId = item.productId || item.id || item.product?.id || item.name;
+  const size = String(item.size || item.selectedSize || '100ml').toLowerCase().trim();
+  const name = String(item.name || item.product?.name || '').toLowerCase();
+
+  // Check for Trio/Kit
+  if (String(rawId).toLowerCase().startsWith('trio-') || name.includes('trio') || name.includes('3x 15ml')) {
+    return 89.90;
+  }
+
+  if (size.includes('15ml') || size === '15') {
+    return 35.00;
+  }
+  if (size.includes('55ml') || size === '55') {
+    return 80.00;
+  }
+  if (size.includes('100ml') || size === '100') {
+    return 130.00;
+  }
+
+  const prod = PRODUCTS.find(p => p.id === rawId || resolveProductKey(rawId) === p.id);
+  if (prod && typeof prod.price === 'number' && prod.price > 0) {
+    return prod.price;
+  }
+
+  return 130.00;
+}
+
+function calculateRealOrderTotal(items: any[], paymentMethod: string, clientFreight: number = 0): { subtotal: number; freight: number; discount: number; total: number } {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { subtotal: 0, freight: 0, discount: 0, total: 0 };
+  }
+
+  let subtotal = 0;
+  items.forEach((item) => {
+    const realPrice = getItemRealPrice(item);
+    const quantity = Math.max(1, Math.floor(Number(item.quantity || 1)));
+    subtotal += realPrice * quantity;
+  });
+
+  const freight = subtotal >= 250.00 ? 0 : Math.max(0, Number(clientFreight) || 0);
+  const discount = paymentMethod === 'pix' ? Number((subtotal * 0.05).toFixed(2)) : 0;
+  const total = Number(Math.max(0, subtotal + freight - discount).toFixed(2));
+
+  return { subtotal, freight, discount, total };
+}
 
 // 1. Create PIX Payment (supports /api/mercadopago/create-pix and /mercadopago/create-pix)
 const handleCreatePix = async (req: express.Request, res: express.Response) => {
@@ -674,10 +885,23 @@ const handleCreatePix = async (req: express.Request, res: express.Response) => {
       });
     }
 
-    const { transaction_amount, description, payer } = req.body;
+    const { items, transaction_amount, description, payer, freightCost } = req.body;
 
-    if (!transaction_amount || !payer || !payer.email) {
+    if (!payer || !payer.email) {
       return res.status(400).json({ error: 'Parâmetros obrigatórios ausentes.' });
+    }
+
+    // Recalculate real total on server side
+    let realAmount = Number(transaction_amount);
+    if (Array.isArray(items) && items.length > 0) {
+      const recalculated = calculateRealOrderTotal(items, 'pix', freightCost);
+      if (recalculated.total > 0) {
+        realAmount = recalculated.total;
+      }
+    }
+
+    if (!realAmount || realAmount <= 0) {
+      return res.status(400).json({ error: 'Valor da transação inválido.' });
     }
 
     const payment = new Payment(client);
@@ -699,7 +923,7 @@ const handleCreatePix = async (req: express.Request, res: express.Response) => {
     }
 
     const body: any = {
-      transaction_amount: Number(transaction_amount),
+      transaction_amount: realAmount,
       description: description || 'Perfumes Premium Swiss - Pedido',
       payment_method_id: 'pix',
       payer: payerData
@@ -764,6 +988,7 @@ const handleProcessCard = async (req: express.Request, res: express.Response) =>
     }
 
     const {
+      items,
       token,
       payment_method_id,
       issuer_id,
@@ -772,50 +997,26 @@ const handleProcessCard = async (req: express.Request, res: express.Response) =>
       description,
       payer,
       orderId,
-      card_number,
-      cardholder,
-      expiration_month,
-      expiration_year,
-      security_code
+      freightCost
     } = req.body;
 
-    let cardToken = token;
-
-    // If no token was provided from frontend SDK, create token on server using MP Public Key / API
-    if (!cardToken && card_number) {
-      const publicKey = process.env.MP_PUBLIC_KEY || process.env.VITE_MERCADO_PAGO_PUBLIC_KEY || 'APP_USR-7e44a0e1-4c6c-4861-9c88-66df5bb4f8fb';
-      const cleanCard = String(card_number).replace(/\D/g, '');
-      const cleanCpf = String(payer?.cpf || cardholder?.identification?.number || '').replace(/\D/g, '');
-
-      const tokenRes = await fetch(`https://api.mercadopago.com/v1/card_tokens?public_key=${publicKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          card_number: cleanCard,
-          expiration_month: parseInt(String(expiration_month), 10),
-          expiration_year: parseInt(String(expiration_year).length === 2 ? `20${expiration_year}` : expiration_year, 10),
-          security_code: String(security_code),
-          cardholder: {
-            name: String(cardholder?.name || payer?.name || 'TITULAR DO CARTAO').toUpperCase(),
-            identification: {
-              type: cleanCpf.length === 14 ? 'CNPJ' : 'CPF',
-              number: cleanCpf
-            }
-          }
-        })
-      });
-
-      const tokenData = await tokenRes.json().catch(() => null);
-      if (tokenRes.ok && tokenData && tokenData.id) {
-        cardToken = tokenData.id;
-      } else {
-        const errorMsg = tokenData?.cause?.[0]?.description || tokenData?.message || 'Dados do cartão inválidos. Verifique o número, validade e CVV.';
-        return res.status(400).json({
-          error: 'CARD_TOKEN_FAILED',
-          message: errorMsg
-        });
+    // Recalculate real card transaction amount on server
+    let realAmount = Number(transaction_amount);
+    if (Array.isArray(items) && items.length > 0) {
+      const recalculated = calculateRealOrderTotal(items, 'credit_card', freightCost);
+      if (recalculated.total > 0) {
+        realAmount = recalculated.total;
       }
     }
+
+    if (!token) {
+      return res.status(400).json({
+        error: 'MISSING_CARD_TOKEN',
+        message: 'Por favor, preencha os dados do cartão de crédito para gerar o token no navegador.'
+      });
+    }
+
+    const cardToken = token;
 
     if (!cardToken) {
       return res.status(400).json({
@@ -834,7 +1035,7 @@ const handleProcessCard = async (req: express.Request, res: express.Response) =>
 
     const payment = new Payment(client);
     const body: any = {
-      transaction_amount: Number(Number(transaction_amount).toFixed(2)),
+      transaction_amount: Number(realAmount.toFixed(2)),
       token: cardToken,
       description: description || `Perfumes Premium Swiss - Pedido ${orderId}`,
       installments: Math.max(1, parseInt(String(installments || 1), 10)),
@@ -933,8 +1134,7 @@ const handleCreatePreference = async (req: express.Request, res: express.Respons
 
     // Validate and format items according to Mercado Pago SDK specification
     const mpItems = (items || []).map((item: any) => {
-      const rawPrice = Number(item.price || item.selectedPrice || item.product?.price || 0);
-      const validPrice = rawPrice > 0 ? Number(rawPrice.toFixed(2)) : 35.00;
+      const validPrice = getItemRealPrice(item);
       const validQty = Math.max(1, Math.floor(Number(item.quantity || 1)));
       const title = String(item.name || item.product?.name || 'Perfume').trim();
       const size = String(item.size || item.selectedSize || '100ml').trim();

@@ -682,6 +682,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,
           body: JSON.stringify({
+            items: snapshotItems.map((i) => ({
+              productId: i.product.id,
+              name: i.product.name,
+              size: i.selectedSize || '100ml',
+              quantity: i.quantity,
+              price: i.selectedPrice
+            })),
+            freightCost: freightCost,
             transaction_amount: snapshotTotal,
             description: `Perfumes Premium Swiss - Pedido ${currentOrderId}`,
             payer: {
@@ -721,28 +729,58 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         setTimer(900);
       }
     } else {
-      // CHECKOUT TRANSPARENTE (PROCESS CREDIT CARD DIRECTLY ON SITE)
+      // CHECKOUT TRANSPARENTE (CLIENT-SIDE TOKENIZATION VIA MERCADO PAGO PUBLIC API)
       try {
         const cleanDocNum = formData.cpf.replace(/\D/g, '');
         const expParts = formData.cardExpiry.split('/');
-        const expMonth = expParts[0] ? expParts[0].trim() : '12';
-        const expYear = expParts[1] ? expParts[1].trim() : '28';
+        const expMonth = parseInt(expParts[0] ? expParts[0].trim() : '12', 10);
+        const expYearRaw = expParts[1] ? expParts[1].trim() : '28';
+        const expYear = parseInt(expYearRaw.length === 2 ? `20${expYearRaw}` : expYearRaw, 10);
+        const publicKey = import.meta.env.VITE_MERCADO_PAGO_PUBLIC_KEY || 'APP_USR-7e44a0e1-4c6c-4861-9c88-66df5bb4f8fb';
 
-        const response = await fetch('/api/mercadopago/process-card', {
+        // 1. Generate card token in browser via MP Public Key (Raw card numbers never reach our backend server)
+        const tokenRes = await fetch(`https://api.mercadopago.com/v1/card_tokens?public_key=${publicKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             card_number: formData.cardNumber.replace(/\D/g, ''),
+            expiration_month: expMonth,
+            expiration_year: expYear,
+            security_code: formData.cardCvv.trim(),
             cardholder: {
               name: formData.cardName.trim().toUpperCase(),
               identification: {
                 type: cleanDocNum.length === 14 ? 'CNPJ' : 'CPF',
                 number: cleanDocNum
               }
-            },
-            expiration_month: parseInt(expMonth, 10),
-            expiration_year: parseInt(expYear.length === 2 ? `20${expYear}` : expYear, 10),
-            security_code: formData.cardCvv.trim(),
+            }
+          })
+        });
+
+        const tokenData = await tokenRes.json().catch(() => null);
+        if (!tokenRes.ok || !tokenData?.id) {
+          const cardErrMsg = tokenData?.cause?.[0]?.description || tokenData?.message || 'Dados do cartão inválidos. Verifique o número, validade e CVV.';
+          setMpError(cardErrMsg);
+          setStep('form');
+          return;
+        }
+
+        const cardToken = tokenData.id;
+
+        // 2. Send ONLY the token to our server
+        const response = await fetch('/api/mercadopago/process-card', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: cardToken,
+            items: snapshotItems.map((i) => ({
+              productId: i.product.id,
+              name: i.product.name,
+              size: i.selectedSize || '100ml',
+              quantity: i.quantity,
+              price: i.selectedPrice
+            })),
+            freightCost: freightCost,
             installments: parseInt(formData.installments || '1', 10),
             transaction_amount: snapshotTotal,
             description: `Perfumes Premium Swiss - Pedido ${currentOrderId}`,

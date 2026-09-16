@@ -1,7 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Star, CheckCircle2, ZoomIn, ZoomOut, X, ChevronLeft, ChevronRight, MessageCircle, Maximize2 } from 'lucide-react';
+import { Star, CheckCircle2, ZoomIn, ZoomOut, X, ChevronLeft, ChevronRight, MessageCircle, Maximize2, PlusCircle, AlertCircle, CheckCircle, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { REAL_FEEDBACK_PRINTS, RealFeedbackPrint } from '../data/content';
+
+interface RealReview {
+  id: string;
+  orderId: string;
+  rating: number;
+  comment: string;
+  customerName: string;
+  customerCity?: string;
+  customerState?: string;
+  photoUrl?: string;
+  createdAt: string;
+}
 
 export const Testimonials: React.FC = () => {
   const [satisfiedClientsCount] = useState('5.240');
@@ -10,6 +22,37 @@ export const Testimonials: React.FC = () => {
   const [isZoomed, setIsZoomed] = useState<boolean>(false);
   const [visibleCount, setVisibleCount] = useState<number>(8);
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({});
+
+  // Real Reviews State from Firestore / API
+  const [reviews, setReviews] = useState<RealReview[]>([]);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [orderIdInput, setOrderIdInput] = useState('');
+  const [ratingInput, setRatingInput] = useState(5);
+  const [commentInput, setCommentInput] = useState('');
+  const [nameInput, setNameInput] = useState('');
+  const [photoInput, setPhotoInput] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewSuccess, setReviewSuccess] = useState<string | null>(null);
+
+  // Load real reviews from backend
+  const fetchReviews = async () => {
+    try {
+      const res = await fetch('/api/reviews');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.reviews)) {
+          setReviews(data.reviews);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching real reviews:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchReviews();
+  }, []);
 
   const handleImageLoad = (id: string) => {
     setLoadedImages((prev) => ({ ...prev, [id]: true }));
@@ -42,6 +85,53 @@ export const Testimonials: React.FC = () => {
     setIsZoomed(false);
   };
 
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!orderIdInput.trim() || !commentInput.trim()) {
+      setReviewError('Por favor, preencha o código do pedido e o seu depoimento.');
+      return;
+    }
+
+    setIsSubmittingReview(true);
+    setReviewError(null);
+    setReviewSuccess(null);
+
+    try {
+      const res = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: orderIdInput.trim(),
+          rating: ratingInput,
+          comment: commentInput.trim(),
+          customerName: nameInput.trim(),
+          photoUrl: photoInput.trim()
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setReviewSuccess(data.message || 'Sua avaliação foi enviada com sucesso!');
+        setOrderIdInput('');
+        setCommentInput('');
+        setNameInput('');
+        setPhotoInput('');
+        fetchReviews();
+        setTimeout(() => {
+          setShowReviewModal(false);
+          setReviewSuccess(null);
+        }, 2000);
+      } else {
+        setReviewError(data.message || 'Não foi possível validar o pedido.');
+      }
+    } catch (err: any) {
+      console.error('Error submitting review:', err);
+      setReviewError('Erro ao conectar com o servidor. Tente novamente.');
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -66,18 +156,80 @@ export const Testimonials: React.FC = () => {
                 <Star key={i} className="w-3.5 h-3.5 fill-current" />
               ))}
             </div>
-            <span className="text-xs font-semibold text-[#E0C078] font-mono">4.9 / 5.0 • WHATSAPP REAL</span>
+            <span className="text-xs font-semibold text-[#E0C078] font-mono">4.9 / 5.0 • AVALIAÇÕES VERIFICADAS</span>
           </div>
 
           <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-normal tracking-tight text-white">
             Mais de <span className="underline decoration-[#C5A059]">{satisfiedClientsCount}</span> Clientes Satisfeitos
           </h2>
           <p className="mt-3 text-xs sm:text-sm text-neutral-300 font-light max-w-xl mx-auto leading-relaxed">
-            Confira abaixo as avaliações e prints autênticos de conversas no WhatsApp em alta definição. 
-            Clique em qualquer print para visualizar em tela cheia e ampliar os detalhes.
+            Confira abaixo os depoimentos reais enviados por clientes que adquiriram seus perfumes Swiss e os prints de atendimento no WhatsApp.
           </p>
-          <div className="w-12 h-[1px] bg-[#C5A059] mx-auto mt-4" />
+          
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
+            <button
+              onClick={() => setShowReviewModal(true)}
+              className="px-6 py-3 bg-[#C5A059] hover:bg-[#D4B06A] text-neutral-950 font-bold text-xs uppercase tracking-wider rounded transition-all shadow-lg flex items-center gap-2 cursor-pointer"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Avaliar meu Pedido</span>
+            </button>
+          </div>
+
+          <div className="w-12 h-[1px] bg-[#C5A059] mx-auto mt-6" />
         </div>
+
+        {/* Real Customer Reviews Section (Firestore) */}
+        {reviews.length > 0 && (
+          <div className="mb-16">
+            <div className="flex items-center gap-2 mb-6">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              <h3 className="font-serif text-xl text-white font-bold tracking-wide">
+                Avaliações Recentes de Compradores
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {reviews.map((rev) => (
+                <div 
+                  key={rev.id}
+                  className="bg-neutral-900/90 border border-neutral-800 hover:border-[#C5A059]/50 p-5 rounded-lg shadow-xl backdrop-blur-md flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex text-[#C5A059]">
+                        {[...Array(rev.rating || 5)].map((_, i) => (
+                          <Star key={i} className="w-4 h-4 fill-current" />
+                        ))}
+                      </div>
+                      <span className="text-[10px] font-mono bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 px-2 py-0.5 rounded uppercase">
+                        Compra Verificada
+                      </span>
+                    </div>
+
+                    <p className="text-xs sm:text-sm text-neutral-200 font-light italic leading-relaxed mb-4">
+                      "{rev.comment}"
+                    </p>
+                  </div>
+
+                  <div>
+                    {rev.photoUrl && (
+                      <div className="mb-3 rounded overflow-hidden aspect-video bg-neutral-950 border border-neutral-800">
+                        <img src={rev.photoUrl} alt="Foto do Cliente" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <div className="pt-3 border-t border-neutral-800/80 flex items-center justify-between text-xs text-neutral-400">
+                      <span className="font-bold text-white">{rev.customerName}</span>
+                      <span className="text-[10px] text-neutral-500 font-mono">
+                        Pedido #{rev.orderId}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Real Feedback Screenshots Grid / Empty State */}
         {REAL_FEEDBACK_PRINTS.length > 0 ? (
@@ -342,6 +494,166 @@ export const Testimonials: React.FC = () => {
               </div>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Leave Review Modal */}
+      <AnimatePresence>
+        {showReviewModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowReviewModal(false)}
+              className="fixed inset-0 bg-black/85 backdrop-blur-md"
+            />
+
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative bg-[#0F0F11] border border-[#C5A059]/50 w-full max-w-lg rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.9)] p-6 text-white z-10 overflow-hidden"
+            >
+              <div className="flex items-center justify-between pb-4 border-b border-neutral-800 mb-6">
+                <div className="flex items-center gap-2">
+                  <Star className="w-5 h-5 text-[#C5A059] fill-current" />
+                  <h3 className="font-serif text-lg font-bold text-white">
+                    Avaliar meu Pedido Swiss
+                  </h3>
+                </div>
+                <button 
+                  onClick={() => setShowReviewModal(false)}
+                  className="p-1 text-neutral-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmitReview} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                    Número do Pedido (código enviado no WhatsApp ou E-mail) *
+                  </label>
+                  <input
+                    type="text"
+                    value={orderIdInput}
+                    onChange={(e) => {
+                      setOrderIdInput(e.target.value);
+                      setReviewError(null);
+                    }}
+                    placeholder="Ex: SWISS-1001"
+                    className="w-full bg-black/70 border border-neutral-700 focus:border-[#C5A059] rounded px-3.5 py-2.5 text-sm text-white outline-none font-mono uppercase"
+                    required
+                  />
+                  <p className="text-[10px] text-neutral-500 mt-1">
+                    Apenas pedidos com pagamento confirmado podem enviar avaliações.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                    Sua Nota para as Fragrâncias *
+                  </label>
+                  <div className="flex items-center gap-2 py-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setRatingInput(star)}
+                        className="p-1 transition-transform hover:scale-110 cursor-pointer"
+                      >
+                        <Star 
+                          className={`w-7 h-7 ${star <= ratingInput ? 'text-[#C5A059] fill-current' : 'text-neutral-600'}`} 
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                    Seu Nome (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    placeholder="Ex: Maria S."
+                    className="w-full bg-black/70 border border-neutral-700 focus:border-[#C5A059] rounded px-3.5 py-2.5 text-sm text-white outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                    Seu Depoimento sobre os Perfumes e Atendimento *
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={commentInput}
+                    onChange={(e) => {
+                      setCommentInput(e.target.value);
+                      setReviewError(null);
+                    }}
+                    placeholder="Conte como foi sua experiência com a fixação e similaridade das fragrâncias..."
+                    className="w-full bg-black/70 border border-neutral-700 focus:border-[#C5A059] rounded px-3.5 py-2.5 text-sm text-white outline-none resize-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                    Link de Foto do Perfume/Caixa (opcional)
+                  </label>
+                  <input
+                    type="url"
+                    value={photoInput}
+                    onChange={(e) => setPhotoInput(e.target.value)}
+                    placeholder="https://..."
+                    className="w-full bg-black/70 border border-neutral-700 focus:border-[#C5A059] rounded px-3.5 py-2.5 text-xs text-white outline-none"
+                  />
+                </div>
+
+                {reviewError && (
+                  <div className="p-3 bg-red-950/80 border border-red-800 rounded text-xs text-red-300 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{reviewError}</span>
+                  </div>
+                )}
+
+                {reviewSuccess && (
+                  <div className="p-3 bg-emerald-950/80 border border-emerald-800 rounded text-xs text-emerald-300 flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{reviewSuccess}</span>
+                  </div>
+                )}
+
+                <div className="pt-2 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowReviewModal(false)}
+                    className="px-4 py-2.5 text-neutral-400 hover:text-white text-xs font-semibold rounded"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingReview}
+                    className="px-6 py-2.5 bg-[#C5A059] hover:bg-[#D4B06A] text-neutral-950 font-bold text-xs uppercase tracking-wider rounded transition-all shadow-md disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                  >
+                    {isSubmittingReview ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Validando...</span>
+                      </>
+                    ) : (
+                      <span>Enviar Avaliação</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </section>

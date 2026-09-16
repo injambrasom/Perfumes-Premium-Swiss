@@ -33,20 +33,24 @@ import { Order, OrderStatus } from '../types';
 import { 
   subscribeToOrders, 
   updateOrderStatusInFirebase, 
-  deleteOrderFromFirebase 
+  deleteOrderFromFirebase,
+  loginAdminWithFirebase,
+  logoutAdmin,
+  auth
 } from '../lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 interface AdminOrdersModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const DEFAULT_ADMIN_PIN = 'swiss2026';
-
 export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ isOpen, onClose }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [pinInput, setPinInput] = useState('');
-  const [pinError, setPinError] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('todos');
@@ -58,17 +62,18 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ isOpen, onCl
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [generatingLinkOrderId, setGeneratingLinkOrderId] = useState<string | null>(null);
-  const [showChangePin, setShowChangePin] = useState(false);
-  const [newPin, setNewPin] = useState('');
-  const [pinSuccessMsg, setPinSuccessMsg] = useState('');
 
-  // Check saved authentication session
+  // Monitor Firebase Auth state
   useEffect(() => {
-    const sessionAuth = sessionStorage.getItem('swiss_admin_auth');
-    if (sessionAuth === 'true') {
-      setIsAuthenticated(true);
-    }
-  }, [isOpen]);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user && (user.email?.endsWith('@swiss.com') || user.email === 'admin@swiss.com')) {
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Subscribe to live orders in real time
   useEffect(() => {
@@ -90,38 +95,38 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ isOpen, onCl
 
   if (!isOpen) return null;
 
-  const getSavedPin = (): string => {
-    return localStorage.getItem('swiss_admin_pin') || DEFAULT_ADMIN_PIN;
-  };
-
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const correctPin = getSavedPin();
-    if (pinInput.trim() === correctPin || pinInput.trim() === '1234' || pinInput.trim() === 'admin') {
+    if (!emailInput.trim() || !passwordInput) {
+      setAuthError('Por favor, informe o e-mail e a senha do administrador.');
+      return;
+    }
+
+    setIsSubmittingAuth(true);
+    setAuthError(null);
+
+    try {
+      await loginAdminWithFirebase(emailInput.trim(), passwordInput);
       setIsAuthenticated(true);
-      sessionStorage.setItem('swiss_admin_auth', 'true');
-      setPinError(false);
-      setPinInput('');
-    } else {
-      setPinError(true);
+      setEmailInput('');
+      setPasswordInput('');
+    } catch (err: any) {
+      console.error('Erro na autenticação de administrador:', err);
+      const msg = err?.message?.includes('invalid-credential')
+        ? 'Credenciais inválidas. Verifique o e-mail e a senha.'
+        : err?.message || 'Falha ao realizar login administrativo.';
+      setAuthError(msg);
+    } finally {
+      setIsSubmittingAuth(false);
     }
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    sessionStorage.removeItem('swiss_admin_auth');
-  };
-
-  const handleChangePin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newPin.trim().length >= 4) {
-      localStorage.setItem('swiss_admin_pin', newPin.trim());
-      setPinSuccessMsg('Senha de acesso alterada com sucesso!');
-      setNewPin('');
-      setTimeout(() => {
-        setPinSuccessMsg('');
-        setShowChangePin(false);
-      }, 2000);
+  const handleLogout = async () => {
+    try {
+      await logoutAdmin();
+      setIsAuthenticated(false);
+    } catch {
+      setIsAuthenticated(false);
     }
   };
 
@@ -349,50 +354,72 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ isOpen, onCl
 
           {/* Content */}
           {!isAuthenticated ? (
-            /* PIN Protection Screen */
+            /* Firebase Auth Login Screen */
             <div className="p-8 sm:p-12 flex flex-col items-center justify-center text-center my-auto">
               <div className="w-16 h-16 rounded-full bg-neutral-900 border border-[#C5A059]/40 flex items-center justify-center mb-6 shadow-[0_0_25px_rgba(197,160,89,0.2)]">
                 <Lock className="w-8 h-8 text-[#C5A059]" />
               </div>
               
               <h3 className="font-serif text-xl sm:text-2xl font-bold text-white mb-2">
-                Acesso do Administrador
+                Autenticação de Administrador
               </h3>
               <p className="text-xs text-neutral-400 max-w-sm mb-6">
-                Área restrita para visualização dos pedidos salvos no banco de dados, emissão de envios e atendimento.
+                Acesso restrito via Firebase Authentication. Entre com seu e-mail e senha cadastrados.
               </p>
 
-              <form onSubmit={handleLogin} className="w-full max-w-xs space-y-4">
+              <form onSubmit={handleLogin} className="w-full max-w-sm space-y-4 text-left">
                 <div>
+                  <label className="block text-xs text-neutral-300 font-medium mb-1">E-mail do Administrador</label>
                   <input
-                    type="password"
-                    value={pinInput}
+                    type="email"
+                    value={emailInput}
                     onChange={(e) => {
-                      setPinInput(e.target.value);
-                      setPinError(false);
+                      setEmailInput(e.target.value);
+                      setAuthError(null);
                     }}
-                    placeholder="Digite a senha de administrador"
-                    className="w-full bg-black/60 border border-neutral-700 focus:border-[#C5A059] rounded px-4 py-3 text-center text-sm tracking-widest text-white outline-none"
+                    placeholder="admin@swiss.com"
+                    className="w-full bg-black/60 border border-neutral-700 focus:border-[#C5A059] rounded px-4 py-2.5 text-sm text-white outline-none"
+                    required
                     autoFocus
                   />
-                  {pinError && (
-                    <p className="text-[11px] text-red-400 mt-2 flex items-center justify-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5" />
-                      Senha incorreta. Tente novamente.
-                    </p>
-                  )}
                 </div>
+
+                <div>
+                  <label className="block text-xs text-neutral-300 font-medium mb-1">Senha de Acesso</label>
+                  <input
+                    type="password"
+                    value={passwordInput}
+                    onChange={(e) => {
+                      setPasswordInput(e.target.value);
+                      setAuthError(null);
+                    }}
+                    placeholder="••••••••"
+                    className="w-full bg-black/60 border border-neutral-700 focus:border-[#C5A059] rounded px-4 py-2.5 text-sm text-white outline-none"
+                    required
+                  />
+                </div>
+
+                {authError && (
+                  <div className="p-3 bg-red-950/80 border border-red-800 rounded text-[12px] text-red-300 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{authError}</span>
+                  </div>
+                )}
 
                 <button
                   type="submit"
-                  className="w-full py-3 bg-[#C5A059] hover:bg-[#D4B06A] text-neutral-950 font-bold uppercase text-xs tracking-wider rounded transition-all shadow-md cursor-pointer"
+                  disabled={isSubmittingAuth}
+                  className="w-full py-3 bg-[#C5A059] hover:bg-[#D4B06A] text-neutral-950 font-bold uppercase text-xs tracking-wider rounded transition-all shadow-md cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  Entrar no Painel
+                  {isSubmittingAuth ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Autenticando...</span>
+                    </>
+                  ) : (
+                    <span>Entrar no Painel</span>
+                  )}
                 </button>
-
-                <p className="text-[10px] text-neutral-500 font-mono">
-                  Dica: Senha padrão de ateliê é <span className="text-[#C5A059]">swiss2026</span>
-                </p>
               </form>
             </div>
           ) : (
@@ -736,42 +763,7 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ isOpen, onCl
               {/* Footer Settings Area */}
               <div className="pt-4 border-t border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-neutral-500">
                 <span>Total de {orders.length} pedidos sincronizados no Firestore.</span>
-
-                {!showChangePin ? (
-                  <button
-                    onClick={() => setShowChangePin(true)}
-                    className="hover:text-neutral-300 flex items-center gap-1 text-[11px] underline underline-offset-4"
-                  >
-                    <Key className="w-3 h-3" />
-                    <span>Alterar Senha do Administrador</span>
-                  </button>
-                ) : (
-                  <form onSubmit={handleChangePin} className="flex items-center gap-2">
-                    <input
-                      type="password"
-                      value={newPin}
-                      onChange={(e) => setNewPin(e.target.value)}
-                      placeholder="Nova senha (min 4 dígitos)"
-                      className="bg-black border border-neutral-700 text-xs px-2 py-1 rounded text-white outline-none focus:border-[#C5A059]"
-                    />
-                    <button
-                      type="submit"
-                      className="px-2 py-1 bg-[#C5A059] text-black font-bold text-xs rounded"
-                    >
-                      Salvar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowChangePin(false)}
-                      className="text-neutral-400 hover:text-white text-xs"
-                    >
-                      Cancelar
-                    </button>
-                    {pinSuccessMsg && (
-                      <span className="text-emerald-400 text-[10px]">{pinSuccessMsg}</span>
-                    )}
-                  </form>
-                )}
+                <span className="text-[11px] text-neutral-400">Autenticado via Firebase Auth ({auth.currentUser?.email || 'admin'})</span>
               </div>
             </div>
           )}
