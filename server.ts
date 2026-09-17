@@ -1170,13 +1170,14 @@ const handleProcessCard = async (req: express.Request, res: express.Response) =>
     const rawNumber = parseInt(String(payer?.number || '').replace(/\D/g, ''), 10);
     const streetNum = isNaN(rawNumber) || rawNumber <= 0 ? 100 : rawNumber;
 
+    const initialMethod = payment_method_id.trim().toLowerCase();
     const payment = new Payment(client);
     const body: any = {
       transaction_amount: Number(realAmount.toFixed(2)),
       token: cardToken,
       description: description || `Perfumes Premium Swiss - Pedido ${orderId}`,
       installments: Math.max(1, parseInt(String(installments || 1), 10)),
-      payment_method_id: payment_method_id.trim().toLowerCase(),
+      payment_method_id: initialMethod,
       payer: {
         email: payer?.email && payer.email.includes('@') ? payer.email.trim() : 'cliente@swiss.com',
         first_name: (String(payer?.name || '').trim().split(/\s+/)[0] || 'Cliente').substring(0, 50),
@@ -1198,7 +1199,51 @@ const handleProcessCard = async (req: express.Request, res: express.Response) =>
       body.issuer_id = String(issuer_id);
     }
 
-    const response = await payment.create({ body });
+    let response: any;
+    try {
+      response = await payment.create({ body });
+    } catch (firstErr: any) {
+      const errMsg = String(firstErr?.message || firstErr?.cause?.[0]?.description || '');
+      const isMethodError = errMsg.toLowerCase().includes('payment_method_id') || firstErr?.status === 400 || firstErr?.cause?.[0]?.code === 2005;
+
+      if (isMethodError) {
+        console.warn(`⚠️ Primary payment_method_id '${initialMethod}' failed (${errMsg}). Attempting automatic fallback retry...`);
+
+        const candidateMethods: string[] = [];
+        if (initialMethod === 'elo') {
+          candidateMethods.push('visa', 'master', 'amex', 'hipercard');
+        } else if (initialMethod === 'visa') {
+          candidateMethods.push('elo', 'master', 'amex', 'hipercard');
+        } else if (initialMethod === 'master') {
+          candidateMethods.push('visa', 'elo', 'amex', 'hipercard');
+        } else if (initialMethod === 'amex') {
+          candidateMethods.push('visa', 'master', 'elo', 'hipercard');
+        } else {
+          candidateMethods.push('visa', 'master', 'elo', 'amex', 'hipercard');
+        }
+
+        let retrySuccess = false;
+        for (const fallbackMethod of candidateMethods) {
+          if (fallbackMethod === initialMethod) continue;
+          try {
+            console.log(`🔄 Retrying payment.create with fallback payment_method_id: '${fallbackMethod}'...`);
+            body.payment_method_id = fallbackMethod;
+            response = await payment.create({ body });
+            retrySuccess = true;
+            console.log(`✅ Payment fallback retry with '${fallbackMethod}' SUCCEEDED! Status:`, response?.status);
+            break;
+          } catch (retryErr: any) {
+            console.warn(`❌ Fallback retry with '${fallbackMethod}' failed:`, retryErr?.message || retryErr);
+          }
+        }
+
+        if (!retrySuccess) {
+          throw firstErr;
+        }
+      } else {
+        throw firstErr;
+      }
+    }
 
     return res.json({
       success: response.status === 'approved',

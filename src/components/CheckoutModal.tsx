@@ -98,49 +98,67 @@ export function detectCardBrandByBin(cardNumber: string): { id: string; name: st
   const clean = cardNumber.replace(/\D/g, '');
   if (clean.length < 4) return null;
 
-  // Elo patterns (must check before Visa because Elo has 4-series BINs)
-  if (
-    /^401178|^401179|^431274|^438935|^451416|^457393|^457631|^457632|^504175|^506699|^5067|^5090|^627780|^636297|^636368|^6500|^6504|^6505|^6507|^6509|^6516|^6550|^650/.test(clean)
-  ) {
-    return { id: 'elo', name: 'Elo' };
+  // 1. Elo specific 6-digit & range check (must check exact Elo BINs when 6+ digits available)
+  if (clean.length >= 6) {
+    const eloBins = [
+      '401178', '401179', '438935', '451416', '457393', '457631', '457632',
+      '504175', '506699', '627780', '636297', '636368'
+    ];
+    const bin6 = clean.substring(0, 6);
+    if (eloBins.includes(bin6)) {
+      return { id: 'elo', name: 'Elo' };
+    }
+    const bin4 = parseInt(clean.substring(0, 4), 10);
+    const bin6Num = parseInt(bin6, 10);
+    if (
+      bin4 === 5067 || bin4 === 5090 ||
+      (bin6Num >= 650031 && bin6Num <= 650051) ||
+      (bin6Num >= 650405 && bin6Num <= 650598) ||
+      (bin6Num >= 650700 && bin6Num <= 650727) ||
+      (bin6Num >= 650901 && bin6Num <= 650978) ||
+      (bin6Num >= 651652 && bin6Num <= 651674) ||
+      (bin6Num >= 655000 && bin6Num <= 655058)
+    ) {
+      return { id: 'elo', name: 'Elo' };
+    }
   }
 
-  // Visa
+  // 2. Visa (Starts with 4)
   if (/^4/.test(clean)) {
     return { id: 'visa', name: 'Visa' };
   }
 
-  // Mastercard
+  // 3. Mastercard
   if (/^(5[1-5]|2[2-7])/.test(clean)) {
     return { id: 'master', name: 'Mastercard' };
   }
 
-  // Amex
+  // 4. Amex
   if (/^3[47]/.test(clean)) {
     return { id: 'amex', name: 'American Express' };
   }
 
-  // Hipercard
+  // 5. Hipercard
   if (/^(606282|384100|384140|384160|603514)/.test(clean)) {
     return { id: 'hipercard', name: 'Hipercard' };
   }
 
-  // Diners
+  // 6. Diners
   if (/^3(0[0-5]|[68])/.test(clean)) {
     return { id: 'diners', name: 'Diners Club' };
   }
 
-  // Cabal
+  // 7. Cabal
   if (/^(604201|604309)/.test(clean)) {
     return { id: 'cabal', name: 'Cabal' };
   }
 
-  // Aura
+  // 8. Aura
   if (/^5078/.test(clean)) {
     return { id: 'aura', name: 'Aura' };
   }
 
-  return null;
+  return { id: 'visa', name: 'Visa' };
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
