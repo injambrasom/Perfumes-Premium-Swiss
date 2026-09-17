@@ -22,15 +22,13 @@ export const Testimonials: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState<number>(8);
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({});
 
-  // Real Reviews State from Firestore / API
+  // Real Reviews & Orders State from Firestore / API
   const [reviews, setReviews] = useState<RealReview[]>([]);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [completedOrdersCount, setCompletedOrdersCount] = useState<number | null>(null);
 
-  const satisfiedClientsCount = '5.240';
-  const totalReviewsCount = reviews.length > 0 
-    ? (5240 + reviews.length).toLocaleString('pt-BR') 
-    : satisfiedClientsCount;
   const [orderIdInput, setOrderIdInput] = useState('');
+  const [emailInput, setEmailInput] = useState('');
   const [ratingInput, setRatingInput] = useState(5);
   const [commentInput, setCommentInput] = useState('');
   const [nameInput, setNameInput] = useState('');
@@ -54,8 +52,24 @@ export const Testimonials: React.FC = () => {
     }
   };
 
+  // Load real count of completed/confirmed orders from backend
+  const fetchCompletedOrdersCount = async () => {
+    try {
+      const res = await fetch('/api/orders/count-completed');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && typeof data.count === 'number') {
+          setCompletedOrdersCount(data.count);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching completed orders count:', err);
+    }
+  };
+
   useEffect(() => {
     fetchReviews();
+    fetchCompletedOrdersCount();
   }, []);
 
   const handleImageLoad = (id: string) => {
@@ -91,8 +105,8 @@ export const Testimonials: React.FC = () => {
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orderIdInput.trim() || !commentInput.trim()) {
-      setReviewError('Por favor, preencha o código do pedido e o seu depoimento.');
+    if (!orderIdInput.trim() || !emailInput.trim() || !commentInput.trim()) {
+      setReviewError('Por favor, preencha o código do pedido, o e-mail do comprador e o seu depoimento.');
       return;
     }
 
@@ -106,6 +120,7 @@ export const Testimonials: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orderId: orderIdInput.trim(),
+          email: emailInput.trim(),
           rating: ratingInput,
           comment: commentInput.trim(),
           customerName: nameInput.trim(),
@@ -117,6 +132,7 @@ export const Testimonials: React.FC = () => {
       if (data.success) {
         setReviewSuccess(data.message || 'Sua avaliação foi enviada com sucesso!');
         setOrderIdInput('');
+        setEmailInput('');
         setCommentInput('');
         setNameInput('');
         setPhotoInput('');
@@ -164,7 +180,17 @@ export const Testimonials: React.FC = () => {
           </div>
 
           <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-normal tracking-tight text-white">
-            Mais de <span className="underline decoration-[#C5A059]">{totalReviewsCount}</span> Clientes Satisfeitos
+            {completedOrdersCount !== null && completedOrdersCount > 0 ? (
+              <>
+                Mais de <span className="underline decoration-[#C5A059]">{completedOrdersCount.toLocaleString('pt-BR')}</span> Pedidos Entregues
+              </>
+            ) : reviews.length > 0 ? (
+              <>
+                <span className="underline decoration-[#C5A059]">{reviews.length.toLocaleString('pt-BR')}</span> Avaliações Verificadas
+              </>
+            ) : (
+              <>Avaliações e Depoimentos Verificados</>
+            )}
           </h2>
           <p className="mt-3 text-xs sm:text-sm text-neutral-300 font-light max-w-xl mx-auto leading-relaxed">
             Confira abaixo os depoimentos reais enviados por clientes que adquiriram seus perfumes Swiss e os prints de atendimento no WhatsApp.
@@ -552,6 +578,26 @@ export const Testimonials: React.FC = () => {
                   />
                   <p className="text-[10px] text-neutral-500 mt-1">
                     Apenas pedidos com pagamento confirmado podem enviar avaliações.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                    E-mail cadastrado no Pedido *
+                  </label>
+                  <input
+                    type="email"
+                    value={emailInput}
+                    onChange={(e) => {
+                      setEmailInput(e.target.value);
+                      setReviewError(null);
+                    }}
+                    placeholder="seuemail@exemplo.com"
+                    className="w-full bg-black/70 border border-neutral-700 focus:border-[#C5A059] rounded px-3.5 py-2.5 text-sm text-white outline-none"
+                    required
+                  />
+                  <p className="text-[10px] text-neutral-500 mt-1">
+                    O e-mail deve ser o mesmo informado no momento da compra.
                   </p>
                 </div>
 

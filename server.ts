@@ -732,16 +732,17 @@ app.post('/api/inventory/deduct', async (req, res) => {
 // REVIEWS & FEEDBACK API ENDPOINTS
 // ==========================================
 app.post('/api/reviews', async (req, res) => {
-  const { orderId, rating, comment, customerName, photoUrl } = req.body || {};
+  const { orderId, email, rating, comment, customerName, photoUrl } = req.body || {};
 
-  if (!orderId || !comment || !rating) {
+  if (!orderId || !email || !comment || !rating) {
     return res.status(400).json({
       success: false,
-      message: 'Por favor, informe o número do pedido, nota (1 a 5) e o seu comentário.'
+      message: 'Por favor, informe o número do pedido, e-mail do comprador, nota (1 a 5) e o seu comentário.'
     });
   }
 
   const cleanOrderId = orderId.toString().trim().replace(/^#/, '');
+  const inputEmail = email.toString().trim().toLowerCase();
 
   if (!firestoreDb) {
     return res.status(500).json({
@@ -774,7 +775,34 @@ app.post('/api/reviews', async (req, res) => {
       });
     }
 
-    // Verify payment status (allow concluded/delivered or confirmed orders)
+    // 1. Check order ownership via email
+    const orderEmail = (
+      foundOrder.customer?.email ||
+      foundOrder.email ||
+      foundOrder.customerEmail ||
+      ''
+    ).toString().trim().toLowerCase();
+
+    if (!orderEmail || inputEmail !== orderEmail) {
+      return res.status(403).json({
+        success: false,
+        message: 'E-mail não corresponde ao pedido informado.'
+      });
+    }
+
+    // 2. Check for duplicate review for the same orderId
+    const reviewsCol = collection(firestoreDb, 'reviews');
+    const existingReviewQuery = query(reviewsCol, where('orderId', '==', cleanOrderId));
+    const existingReviewSnap = await getDocs(existingReviewQuery);
+
+    if (!existingReviewSnap.empty) {
+      return res.status(400).json({
+        success: false,
+        message: 'Este pedido já foi avaliado anteriormente.'
+      });
+    }
+
+    // 3. Verify payment status (allow concluded/delivered or confirmed orders)
     const validStatuses = ['pago', 'em_preparo', 'enviado', 'entregue', 'concluido'];
     if (!validStatuses.includes(foundOrder.status)) {
       return res.status(400).json({
@@ -830,6 +858,31 @@ app.get('/api/reviews', async (req, res) => {
   } catch (err) {
     console.error('[GET REVIEWS ERROR]:', err);
     return res.json({ success: true, reviews: [] });
+  }
+});
+
+app.get('/api/orders/count-completed', async (req, res) => {
+  if (!firestoreDb) {
+    return res.json({ success: true, count: 0 });
+  }
+
+  try {
+    const validStatuses = ['pago', 'em_preparo', 'enviado', 'entregue', 'concluido'];
+    const ordersCol = collection(firestoreDb, 'orders');
+    const qSnap = await getDocs(ordersCol);
+
+    let count = 0;
+    qSnap.docs.forEach(docSnap => {
+      const data = docSnap.data();
+      if (data && validStatuses.includes(data.status)) {
+        count++;
+      }
+    });
+
+    return res.json({ success: true, count });
+  } catch (err) {
+    console.error('[COUNT COMPLETED ORDERS ERROR]:', err);
+    return res.json({ success: true, count: 0 });
   }
 });
 
