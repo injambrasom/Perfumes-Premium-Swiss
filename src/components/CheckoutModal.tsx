@@ -1446,7 +1446,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     <div className="bg-emerald-50/80 p-3 rounded-lg border border-emerald-200 flex items-center justify-between">
                       <div className="flex items-center gap-2 text-emerald-950 font-semibold text-xs">
                         <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                        <span>Checkout Pro Mercado Pago • Total Segurança</span>
+                        <span>Checkout Transparente • Processamento 100% no Site</span>
                       </div>
                       <span className="text-[10px] bg-emerald-100 text-emerald-800 font-medium px-2 py-0.5 rounded font-mono">
                         SSL 256-bit
@@ -1454,14 +1454,94 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     </div>
 
                     <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 space-y-3 text-xs">
-                      <div className="flex items-center gap-2 text-neutral-900 font-semibold text-sm">
+                      <div className="flex items-center gap-2 text-neutral-900 font-semibold text-sm pb-1 border-b border-neutral-200">
                         <CreditCard className="w-5 h-5 text-[#C5A059]" />
-                        <span>Pagamento via Cartão de Crédito</span>
+                        <span>Dados do Cartão de Crédito</span>
                       </div>
-                      <p className="text-neutral-600 leading-relaxed">
-                        Ao clicar no botão abaixo, você será redirecionado para a página oficial do <strong>Mercado Pago</strong> para concluir o pagamento com seu cartão de crédito com total segurança. Lá você poderá selecionar o parcelamento em até <strong>12x</strong>.
-                      </p>
-                      <div className="pt-2 border-t border-neutral-200 flex flex-wrap items-center justify-between gap-2 text-[11px] text-neutral-500">
+
+                      <div>
+                        <label className="block text-neutral-700 font-medium mb-1">
+                          Número do Cartão *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="0000 0000 0000 0000"
+                          maxLength={19}
+                          value={formData.cardNumber}
+                          onChange={(e) => handleInputChange('cardNumber', e.target.value)}
+                          className={`w-full px-3 py-2 rounded border bg-white text-neutral-900 font-sans text-xs focus:outline-none transition-colors ${
+                            formErrors.cardNumber ? 'border-red-500 bg-red-50' : 'border-neutral-300 focus:border-[#C5A059]'
+                          }`}
+                        />
+                        {formErrors.cardNumber && <p className="text-[10px] text-red-500 mt-0.5">{formErrors.cardNumber}</p>}
+                      </div>
+
+                      <div>
+                        <label className="block text-neutral-700 font-medium mb-1">
+                          Nome Impresso no Cartão *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="COMO ESTÁ ESCRITO NO CARTÃO"
+                          value={formData.cardName}
+                          onChange={(e) => handleInputChange('cardName', e.target.value.toUpperCase())}
+                          className={`w-full px-3 py-2 rounded border bg-white text-neutral-900 font-sans text-xs uppercase focus:outline-none transition-colors ${
+                            formErrors.cardName ? 'border-red-500 bg-red-50' : 'border-neutral-300 focus:border-[#C5A059]'
+                          }`}
+                        />
+                        {formErrors.cardName && <p className="text-[10px] text-red-500 mt-0.5">{formErrors.cardName}</p>}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-neutral-700 font-medium mb-1">
+                            Validade *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="MM/AA"
+                            maxLength={5}
+                            value={formData.cardExpiry}
+                            onChange={(e) => handleInputChange('cardExpiry', e.target.value)}
+                            className={`w-full px-3 py-2 rounded border bg-white text-neutral-900 font-sans text-xs focus:outline-none transition-colors ${
+                              formErrors.cardExpiry ? 'border-red-500 bg-red-50' : 'border-neutral-300 focus:border-[#C5A059]'
+                            }`}
+                          />
+                          {formErrors.cardExpiry && <p className="text-[10px] text-red-500 mt-0.5">{formErrors.cardExpiry}</p>}
+                        </div>
+
+                        <div>
+                          <label className="block text-neutral-700 font-medium mb-1">
+                            Código CVV *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="123"
+                            maxLength={4}
+                            value={formData.cardCvv}
+                            onChange={(e) => handleInputChange('cardCvv', e.target.value)}
+                            className={`w-full px-3 py-2 rounded border bg-white text-neutral-900 font-sans text-xs focus:outline-none transition-colors ${
+                              formErrors.cardCvv ? 'border-red-500 bg-red-50' : 'border-neutral-300 focus:border-[#C5A059]'
+                            }`}
+                          />
+                          {formErrors.cardCvv && <p className="text-[10px] text-red-500 mt-0.5">{formErrors.cardCvv}</p>}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-neutral-700 font-medium mb-1">
+                          Opção de Parcelamento *
+                        </label>
+                        <select
+                          value={formData.installments}
+                          onChange={(e) => handleInputChange('installments', e.target.value)}
+                          className="w-full px-3 py-2 rounded border border-neutral-300 bg-white text-neutral-900 font-sans text-xs focus:outline-none focus:border-[#C5A059] transition-colors cursor-pointer"
+                        >
+                          {getInstallmentOptions()}
+                        </select>
+                      </div>
+
+                      <div className="pt-2 border-t border-neutral-200 flex items-center justify-between text-[11px] text-neutral-500">
                         <span className="flex items-center gap-1 font-medium text-neutral-700">
                           <Lock className="w-3.5 h-3.5 text-emerald-600" />
                           Visa • Mastercard • Amex • Elo • Hipercard
@@ -1486,7 +1566,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   ) : (
                     <>
                       <CreditCard className="w-4 h-4 text-[#C5A059]" />
-                      <span>Ir para Pagamento com Cartão • R$ {finalTotal.toFixed(2).replace('.', ',')}</span>
+                      <span>Finalizar Pagamento com Cartão • {getInstallmentInfo(formData.installments).shortLabel}</span>
                     </>
                   )}
                 </button>
@@ -1517,7 +1597,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
               <h3 className="font-serif text-lg font-semibold text-neutral-900">
                 {paymentMethod === 'credit_card' 
-                  ? 'Preparando Checkout Seguro do Mercado Pago...' 
+                  ? 'Processando pagamento no Cartão de Crédito...' 
                   : 'Gerando QR Code PIX Seguro...'}
               </h3>
               <p className="text-xs text-neutral-500 font-light max-w-sm mx-auto">
