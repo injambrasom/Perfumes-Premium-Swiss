@@ -93,6 +93,56 @@ export function generateValidPixPayload(amount: number, pixKey: string = 'c10992
   return payloadWithoutCRC + checksum;
 }
 
+// Helper to detect credit card brand (payment_method_id) by BIN for Mercado Pago
+export function detectCardBrandByBin(cardNumber: string): { id: string; name: string } | null {
+  const clean = cardNumber.replace(/\D/g, '');
+  if (clean.length < 4) return null;
+
+  // Elo patterns (must check before Visa because Elo has 4-series BINs)
+  if (
+    /^401178|^401179|^431274|^438935|^451416|^457393|^457631|^457632|^504175|^506699|^5067|^5090|^627780|^636297|^636368|^6500|^6504|^6505|^6507|^6509|^6516|^6550|^650/.test(clean)
+  ) {
+    return { id: 'elo', name: 'Elo' };
+  }
+
+  // Visa
+  if (/^4/.test(clean)) {
+    return { id: 'visa', name: 'Visa' };
+  }
+
+  // Mastercard
+  if (/^(5[1-5]|2[2-7])/.test(clean)) {
+    return { id: 'master', name: 'Mastercard' };
+  }
+
+  // Amex
+  if (/^3[47]/.test(clean)) {
+    return { id: 'amex', name: 'American Express' };
+  }
+
+  // Hipercard
+  if (/^(606282|384100|384140|384160|603514)/.test(clean)) {
+    return { id: 'hipercard', name: 'Hipercard' };
+  }
+
+  // Diners
+  if (/^3(0[0-5]|[68])/.test(clean)) {
+    return { id: 'diners', name: 'Diners Club' };
+  }
+
+  // Cabal
+  if (/^(604201|604309)/.test(clean)) {
+    return { id: 'cabal', name: 'Cabal' };
+  }
+
+  // Aura
+  if (/^5078/.test(clean)) {
+    return { id: 'aura', name: 'Aura' };
+  }
+
+  return null;
+}
+
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   isOpen,
   onClose,
@@ -115,6 +165,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [pixPaymentId, setPixPaymentId] = useState<string | number | null>(null);
   const [mpError, setMpError] = useState<string | null>(null);
   const [mpPublicKey, setMpPublicKey] = useState<string>(import.meta.env.VITE_MERCADO_PAGO_PUBLIC_KEY || '');
+  const [cardBrand, setCardBrand] = useState<{ id: string; name: string } | null>(null);
 
   // Snapshot of submitted order to prevent items being wiped out by onClearCart
   const [submittedOrderInfo, setSubmittedOrderInfo] = useState<{
@@ -408,10 +459,43 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let v = e.target.value.replace(/\D/g, '');
-    if (v.length > 16) v = v.substring(0, 16);
-    v = v.replace(/(\d{4})(?=\d)/g, '$1 ');
-    handleInputChange('cardNumber', v);
+    let raw = e.target.value.replace(/\D/g, '');
+    if (raw.length > 16) raw = raw.substring(0, 16);
+    const formatted = raw.replace(/(\d{4})(?=\d)/g, '$1 ');
+    handleInputChange('cardNumber', formatted);
+
+    if (raw.length < 4) {
+      setCardBrand(null);
+      return;
+    }
+
+    // 1. Instant client-side BIN detection by regex pattern
+    const instantBrand = detectCardBrandByBin(raw);
+    setCardBrand(instantBrand);
+
+    // 2. Query official Mercado Pago payment_methods API for exact BIN identification (first 6 digits)
+    if (raw.length >= 6) {
+      const bin = raw.substring(0, 6);
+      const pk = mpPublicKey || import.meta.env.VITE_MERCADO_PAGO_PUBLIC_KEY;
+      if (pk) {
+        fetch(`https://api.mercadopago.com/v1/payment_methods/search?public_key=${pk}&bin=${bin}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data && Array.isArray(data.results) && data.results.length > 0) {
+              const mpMethod = data.results[0];
+              if (mpMethod && mpMethod.id) {
+                setCardBrand({
+                  id: mpMethod.id,
+                  name: mpMethod.name || mpMethod.id.toUpperCase()
+                });
+              }
+            }
+          })
+          .catch(() => {
+            // Fallback to instant client-side BIN detection on error
+          });
+      }
+    }
   };
 
   const handleCardExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -565,6 +649,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       const cleanCard = formData.cardNumber.replace(/\D/g, '');
       if (!cleanCard || cleanCard.length < 13) {
         errors.cardNumber = 'Número do cartão inválido';
+      } else {
+        const detectedId = cardBrand?.id || detectCardBrandByBin(cleanCard)?.id;
+        if (!detectedId) {
+          errors.cardNumber = 'Bandeira do cartão não identificada. Verifique os números.';
+        }
       }
       if (!formData.cardName.trim()) {
         errors.cardName = 'Nome impresso no cartão é obrigatório';
@@ -771,13 +860,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         }
 
         const cardToken = tokenData.id;
+        const detectedMethodId = cardBrand?.id || detectCardBrandByBin(formData.cardNumber)?.id;
 
-        // 2. Send ONLY the token to our server
+        if (!detectedMethodId) {
+          setMpError('Não foi possível identificar a bandeira do cartão. Verifique o número digitado.');
+          setStep('form');
+          return;
+        }
+
+        // 2. Send token & detected payment_method_id to our server
         const response = await fetch('/api/mercadopago/process-card', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             token: cardToken,
+            payment_method_id: detectedMethodId,
             items: snapshotItems.map((i) => ({
               productId: i.product.id,
               name: i.product.name,
@@ -1460,15 +1557,23 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       </div>
 
                       <div>
-                        <label className="block text-neutral-700 font-medium mb-1">
-                          Número do Cartão *
-                        </label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-neutral-700 font-medium">
+                            Número do Cartão *
+                          </label>
+                          {(cardBrand || detectCardBrandByBin(formData.cardNumber)) && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 text-[#8B6E32] border border-[#C5A059]/40 flex items-center gap-1 uppercase tracking-wider">
+                              <CreditCard className="w-3 h-3 text-[#C5A059]" />
+                              {(cardBrand || detectCardBrandByBin(formData.cardNumber))?.name}
+                            </span>
+                          )}
+                        </div>
                         <input
                           type="text"
                           placeholder="0000 0000 0000 0000"
                           maxLength={19}
                           value={formData.cardNumber}
-                          onChange={(e) => handleInputChange('cardNumber', e.target.value)}
+                          onChange={handleCardNumberChange}
                           className={`w-full px-3 py-2 rounded border bg-white text-neutral-900 font-sans text-xs focus:outline-none transition-colors ${
                             formErrors.cardNumber ? 'border-red-500 bg-red-50' : 'border-neutral-300 focus:border-[#C5A059]'
                           }`}

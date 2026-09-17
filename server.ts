@@ -1146,6 +1146,13 @@ const handleProcessCard = async (req: express.Request, res: express.Response) =>
       });
     }
 
+    if (!payment_method_id || typeof payment_method_id !== 'string' || !payment_method_id.trim()) {
+      return res.status(400).json({
+        error: 'PAYMENT_METHOD_REQUIRED',
+        message: 'Não foi possível identificar a bandeira do cartão. Verifique o número digitado.'
+      });
+    }
+
     const cardToken = token;
 
     if (!cardToken) {
@@ -1169,7 +1176,7 @@ const handleProcessCard = async (req: express.Request, res: express.Response) =>
       token: cardToken,
       description: description || `Perfumes Premium Swiss - Pedido ${orderId}`,
       installments: Math.max(1, parseInt(String(installments || 1), 10)),
-      payment_method_id: payment_method_id || 'visa',
+      payment_method_id: payment_method_id.trim().toLowerCase(),
       payer: {
         email: payer?.email && payer.email.includes('@') ? payer.email.trim() : 'cliente@swiss.com',
         first_name: (String(payer?.name || '').trim().split(/\s+/)[0] || 'Cliente').substring(0, 50),
