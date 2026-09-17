@@ -230,23 +230,23 @@ export const Hero: React.FC<HeroProps> = ({
       onTouchEnd={handleTouchEnd}
     >
       {/* CAROUSEL VIEWPORT CONTAINER */}
-      <div className="relative w-full h-[280px] sm:h-[420px] md:h-[480px] lg:h-[540px] overflow-hidden bg-[#0B0B0B]">
+      <div className="relative w-full aspect-[16/9] sm:aspect-auto sm:h-[420px] md:h-[480px] lg:h-[540px] overflow-hidden bg-[#0B0B0B]">
         
         {/* Floating Side Navigation Arrows */}
         <button
           onClick={handlePrev}
           aria-label="Banner anterior"
-          className="absolute left-1.5 sm:left-6 top-1/2 -translate-y-1/2 z-30 w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
+          className="absolute left-1 sm:left-6 top-1/2 -translate-y-1/2 z-30 w-7 h-7 sm:w-12 sm:h-12 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
         >
-          <ChevronLeft className="w-4 h-4 sm:w-6 sm:h-6 transform group-hover:-translate-x-0.5 transition-transform" />
+          <ChevronLeft className="w-3.5 h-3.5 sm:w-6 sm:h-6 transform group-hover:-translate-x-0.5 transition-transform" />
         </button>
 
         <button
           onClick={handleNext}
           aria-label="Próximo banner"
-          className="absolute right-1.5 sm:right-6 top-1/2 -translate-y-1/2 z-30 w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
+          className="absolute right-1 sm:right-6 top-1/2 -translate-y-1/2 z-30 w-7 h-7 sm:w-12 sm:h-12 rounded-full bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-[#C5A059]/40 transition-all flex items-center justify-center cursor-pointer shadow-2xl backdrop-blur-md group"
         >
-          <ChevronRight className="w-4 h-4 sm:w-6 sm:h-6 transform group-hover:translate-x-0.5 transition-transform" />
+          <ChevronRight className="w-3.5 h-3.5 sm:w-6 sm:h-6 transform group-hover:translate-x-0.5 transition-transform" />
         </button>
 
         {/* Dynamic Overlapping Slide Transitions */}
@@ -273,12 +273,12 @@ export const Hero: React.FC<HeroProps> = ({
                 <img
                   src={currentSlide.imageUrl}
                   alt={currentSlide.title}
-                  className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.008] block"
+                  className="w-full h-full object-contain sm:object-cover object-center transition-transform duration-700 group-hover:scale-[1.008] block"
                 />
 
                 {/* SPECIAL HIGH-IMPACT TYPOGRAPHY OVERLAY FOR TRIO DE BOLSO BANNER */}
                 {currentSlide.id === 'trio' ? (
-                  <div className="absolute inset-0 z-20 flex flex-col justify-between p-3 sm:p-8 md:pl-28 md:py-12 pointer-events-none bg-gradient-to-r from-black/90 via-black/50 to-transparent pl-8 sm:pl-20 md:pl-28">
+                  <div className="absolute inset-0 z-20 flex flex-col justify-between p-2 sm:p-8 md:pl-28 md:py-12 pointer-events-none bg-gradient-to-r from-black/90 via-black/50 to-transparent pl-2.5 sm:pl-20 md:pl-28">
                     {/* Top Badges */}
                     <div className="flex items-center justify-between w-full pointer-events-auto">
                       <div className="inline-flex items-center gap-1.5 px-2 py-0.5 sm:px-3.5 sm:py-1.5 rounded-full bg-black/80 border border-[#C5A059] text-[#C5A059] font-bold text-[8px] sm:text-xs backdrop-blur-md shadow-lg">
@@ -343,8 +343,8 @@ export const Hero: React.FC<HeroProps> = ({
                 ) : (
                   /* DEFAULT OVERLAY FOR PRODUCT BANNERS (BACCARAT, SALVAGE, ALIEM) */
                   <>
-                    <div className="absolute top-3 left-8 sm:top-5 sm:left-20 md:left-28 z-20 pointer-events-auto flex flex-col items-start gap-1">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-black/90 border border-[#C5A059]/70 text-[#C5A059] font-bold text-[9px] sm:text-xs shadow-2xl backdrop-blur-md">
+                    <div className="absolute top-2 left-2 sm:top-5 sm:left-20 md:left-28 z-20 pointer-events-auto flex flex-col items-start gap-1">
+                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-full bg-black/90 border border-[#C5A059]/70 text-[#C5A059] font-bold text-[8px] sm:text-xs shadow-2xl backdrop-blur-md">
                         {renderBadgeIcon(currentSlide.badgeIcon)}
                         <span className="uppercase tracking-wider text-white">
                           {currentSlide.badge}
@@ -352,20 +352,20 @@ export const Hero: React.FC<HeroProps> = ({
                       </div>
                     </div>
 
-                    <div className="absolute bottom-3 left-8 right-3 sm:left-20 md:left-28 sm:right-auto sm:bottom-6 z-20 flex flex-wrap items-center gap-2 pointer-events-auto">
+                    <div className="absolute bottom-2 left-2 right-2 sm:left-20 md:left-28 sm:right-auto sm:bottom-6 z-20 flex flex-wrap items-center gap-2 pointer-events-auto">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleCtaClick(currentSlide);
                         }}
-                        className="px-3.5 py-1.5 sm:px-7 sm:py-3 bg-white text-black hover:bg-[#C5A059] transition-all duration-300 text-[10px] sm:text-sm font-bold tracking-[0.15em] sm:tracking-[0.2em] uppercase flex items-center gap-1.5 shadow-2xl cursor-pointer group"
+                        className="px-2.5 py-1 sm:px-7 sm:py-3 bg-white text-black hover:bg-[#C5A059] transition-all duration-300 text-[9px] sm:text-sm font-bold tracking-[0.1em] sm:tracking-[0.2em] uppercase flex items-center gap-1 shadow-2xl cursor-pointer group"
                       >
                         <span>{currentSlide.ctaText}</span>
                         <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 transform group-hover:translate-x-1 transition-transform" />
                       </button>
 
                       {currentSlide.priceText && (
-                        <span className="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-none bg-black/85 border border-[#C5A059]/60 text-[#C5A059] font-bold text-[10px] sm:text-xs shadow-xl backdrop-blur-md">
+                        <span className="px-2 py-1 sm:px-3.5 sm:py-2 rounded-none bg-black/85 border border-[#C5A059]/60 text-[#C5A059] font-bold text-[9px] sm:text-xs shadow-xl backdrop-blur-md">
                           {currentSlide.priceText}
                         </span>
                       )}

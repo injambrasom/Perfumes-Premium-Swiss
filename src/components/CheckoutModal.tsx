@@ -94,6 +94,34 @@ export function generateValidPixPayload(amount: number, pixKey: string = 'c10992
 }
 
 // Helper to detect credit card brand (payment_method_id) by BIN for Mercado Pago
+function getFriendlyCardErrorMessage(statusDetail?: string, rawMessage?: string): string {
+  switch (statusDetail) {
+    case 'cc_rejected_bad_filled_card_number':
+      return 'Número do cartão incorreto. Verifique os dígitos informados.';
+    case 'cc_rejected_bad_filled_date':
+      return 'Data de validade do cartão incorreta ou expirada.';
+    case 'cc_rejected_bad_filled_security_code':
+      return 'Código de segurança (CVV) incorreto. Verifique no verso do seu cartão.';
+    case 'cc_rejected_bad_filled_other':
+      return 'Dados do cartão incorretos. Verifique o número, validade e CVV.';
+    case 'cc_rejected_call_for_authorize':
+      return 'Pagamento bloqueado pela operadora. Ligue para o seu banco para autorizar esta compra.';
+    case 'cc_rejected_insufficient_amount':
+      return 'Saldo ou limite insuficiente no seu cartão de crédito.';
+    case 'cc_rejected_high_risk':
+      return 'Recusado pelo sistema de segurança/antifraude. Nota: O Mercado Pago não permite realizar pagamentos usando o cartão do próprio dono da conta vendedor. Use outro cartão de terceiro ou pague via PIX com 5% OFF.';
+    case 'cc_rejected_other':
+    case 'cc_rejected_card_disabled':
+      return 'Pagamento recusado pelo banco emissor do cartão. Se você é o titular da conta Mercado Pago, a própria operadora/antifraude pode bloquear autocompras com seu próprio cartão. Tente outro cartão ou pague via PIX.';
+    case 'cc_rejected_max_attempts':
+      return 'Limite de tentativas excedido para este cartão. Tente utilizar outro cartão ou pague via PIX.';
+    case 'cc_rejected_duplicated_payment':
+      return 'Transação duplicada identificada. Aguarde alguns minutos ou pague via PIX.';
+    default:
+      return rawMessage || 'Pagamento não aprovado pela operadora do cartão. Verifique os dados digitados ou pague via PIX com 5% de desconto.';
+  }
+}
+
 export function detectCardBrandByBin(cardNumber: string): { id: string; name: string } | null {
   const clean = cardNumber.replace(/\D/g, '');
   if (clean.length < 4) return null;
@@ -934,8 +962,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           }
           return;
         } else {
-          let errorMsg = data?.message || 'Pagamento não aprovado pela operadora do cartão. Verifique os dados ou pague via PIX com 5% de desconto.';
-          setMpError(errorMsg);
+          const friendlyMsg = getFriendlyCardErrorMessage(data?.status_detail, data?.message);
+          setMpError(friendlyMsg);
           setStep('form');
         }
       } catch (err: any) {
