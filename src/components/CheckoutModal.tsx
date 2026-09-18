@@ -962,7 +962,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           }
           return;
         } else {
-          const friendlyMsg = getFriendlyCardErrorMessage(data?.status_detail, data?.message);
+          let friendlyMsg = getFriendlyCardErrorMessage(data?.status_detail, data?.message);
+          if (data?.id) {
+            friendlyMsg += ` (ID do Pagamento MP: ${data.id} | Status: ${data.status || 'rejected'} | Detalhe: ${data.status_detail || 'N/A'})`;
+          }
           setMpError(friendlyMsg);
           setStep('form');
         }

@@ -1245,6 +1245,15 @@ const handleProcessCard = async (req: express.Request, res: express.Response) =>
       }
     }
 
+    console.log('💳 ====================================================');
+    console.log('💳 MERCADO PAGO CARD PAYMENT RESULT:');
+    console.log(`💳 ID do Pagamento (Payment ID): ${response.id}`);
+    console.log(`💳 Status: ${response.status}`);
+    console.log(`💳 Status Detail: ${response.status_detail}`);
+    console.log(`💳 Payment Method: ${response.payment_method_id}`);
+    console.log(`💳 Amount: R$ ${response.transaction_amount}`);
+    console.log('💳 ====================================================');
+
     return res.json({
       success: response.status === 'approved',
       status: response.status,
