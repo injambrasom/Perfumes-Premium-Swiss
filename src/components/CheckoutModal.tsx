@@ -109,10 +109,10 @@ function getFriendlyCardErrorMessage(statusDetail?: string, rawMessage?: string)
     case 'cc_rejected_insufficient_amount':
       return 'Saldo ou limite insuficiente no seu cartão de crédito.';
     case 'cc_rejected_high_risk':
-      return 'Recusado pelo sistema de segurança/antifraude. Nota: O Mercado Pago não permite realizar pagamentos usando o cartão do próprio dono da conta vendedor. Use outro cartão de terceiro ou pague via PIX com 5% OFF.';
+      return 'Recusado pelo sistema de segurança/antifraude do Mercado Pago. Nota: O Mercado Pago identifica e bloqueia compras feitas na mesma rede Wi-Fi/endereço do vendedor ou com dados vinculados à conta do lojista. Para clientes reais em outros dispositivos/redes, a compra é aprovada normalmente.';
     case 'cc_rejected_other':
     case 'cc_rejected_card_disabled':
-      return 'Pagamento recusado pelo banco emissor do cartão. Se você é o titular da conta Mercado Pago, a própria operadora/antifraude pode bloquear autocompras com seu próprio cartão. Tente outro cartão ou pague via PIX.';
+      return 'Pagamento não aprovado pela operadora do cartão. Se estiver testando no mesmo local/Wi-Fi do lojista, o Mercado Pago pode bloquear por segurança. Experimente testar pelo PIX com 5% OFF.';
     case 'cc_rejected_max_attempts':
       return 'Limite de tentativas excedido para este cartão. Tente utilizar outro cartão ou pague via PIX.';
     case 'cc_rejected_duplicated_payment':
