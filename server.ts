@@ -855,8 +855,8 @@ app.get('/api/reviews', async (req, res) => {
     const qSnap = await getDocs(reviewsCol);
     const reviews = qSnap.docs.map(doc => doc.data());
     return res.json({ success: true, reviews });
-  } catch (err) {
-    console.error('[GET REVIEWS ERROR]:', err);
+  } catch (err: any) {
+    console.warn('[GET REVIEWS]: Aviso ao buscar avaliações no Firestore:', err?.message || err);
     return res.json({ success: true, reviews: [] });
   }
 });
@@ -880,8 +880,8 @@ app.get('/api/orders/count-completed', async (req, res) => {
     });
 
     return res.json({ success: true, count });
-  } catch (err) {
-    console.error('[COUNT COMPLETED ORDERS ERROR]:', err);
+  } catch (err: any) {
+    console.warn('[COUNT COMPLETED ORDERS]: Aviso ao consultar pedidos no Firestore:', err?.message || err);
     return res.json({ success: true, count: 0 });
   }
 });
@@ -979,7 +979,7 @@ function calculateRealOrderTotal(
   }
 
   subtotal = Number(subtotal.toFixed(2));
-  const freight = subtotal >= 250.00 ? 0 : Math.max(0, Number(clientFreight) || 0);
+  const freight = Math.max(0, Number(clientFreight) || 0);
   const discount = paymentMethod === 'pix' ? Number((subtotal * 0.05).toFixed(2)) : 0;
   const total = Number(Math.max(0, subtotal + freight - discount).toFixed(2));
 
@@ -1637,8 +1637,25 @@ app.get('/mercadopago/ipn', handleWebhook);
 // VITE / STATIC SERVING SETUP
 // ==========================================
 async function startServer() {
-  const hasDist = fs.existsSync(path.join(process.cwd(), 'dist', 'index.html'));
-  const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL) || hasDist;
+  const distIndexPath = path.join(process.cwd(), 'dist', 'index.html');
+  const rootIndexPath = path.join(process.cwd(), 'index.html');
+  const distPath = path.join(process.cwd(), 'dist');
+  const isProd = process.env.NODE_ENV === 'production';
+
+  const serveStaticFallback = () => {
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath));
+    }
+    app.get('*', (req, res) => {
+      if (fs.existsSync(distIndexPath)) {
+        return res.sendFile(distIndexPath);
+      }
+      if (fs.existsSync(rootIndexPath)) {
+        return res.sendFile(rootIndexPath);
+      }
+      return res.status(200).send('<!DOCTYPE html><html><head><title>Swiss Perfumes</title><meta http-equiv="refresh" content="2"></head><body style="font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#050505;color:#fff;"><p>Iniciando aplicação...</p></body></html>');
+    });
+  };
 
   if (!isProd && !process.env.VERCEL) {
     try {
@@ -1651,18 +1668,10 @@ async function startServer() {
       app.use(vite.middlewares);
     } catch (e) {
       console.warn('[SERVER] Vite dev middleware unavailable, serving static dist files:', e);
-      const distPath = path.join(process.cwd(), 'dist');
-      app.use(express.static(distPath));
-      app.get('*', (req, res) => {
-        res.sendFile(path.join(distPath, 'index.html'));
-      });
+      serveStaticFallback();
     }
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    serveStaticFallback();
   }
 
   const isVercelServerless = !!(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);

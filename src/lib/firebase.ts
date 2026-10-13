@@ -11,8 +11,16 @@ import {
   getDoc,
   deleteDoc,
   query,
-  orderBy
+  orderBy,
+  setLogLevel
 } from 'firebase/firestore';
+
+// Silence internal Firestore SDK gRPC stream lifecycle logs (e.g. idle stream disconnects)
+try {
+  setLogLevel('silent');
+} catch {
+  // ignore
+}
 import {
   getDatabase,
   ref as rtdbRef,
@@ -255,7 +263,7 @@ export function subscribeToInventory(
 ): () => void {
   seedInitialInventoryIfEmpty().catch(() => {});
 
-  const candidateCollections = ['inventory', 'produtos', 'estoque', 'products', 'perfumes', 'items'];
+  const candidateCollections = ['inventory', 'produtos', 'estoque'];
   const unsubscribes: Array<() => void> = [];
   const accumMap: InventoryStoreMap = {};
 
@@ -298,9 +306,14 @@ export function subscribeToInventory(
             }
           },
           (err) => {
-            if (err?.code === 'permission-denied' || String(err?.message || '').toLowerCase().includes('permissions')) {
-              // Silently absorb permission warnings on candidate collections
-            } else if (onError) {
+            const errStr = String(err?.message || '').toLowerCase();
+            const isIdleDisconnect = err?.code === 'cancelled' || errStr.includes('cancelled') || errStr.includes('idle stream');
+            const isPermError = err?.code === 'permission-denied' || errStr.includes('permission');
+            if (isIdleDisconnect || isPermError) {
+              // Silently absorb benign idle stream disconnect or permission warnings on candidate collections
+              return;
+            }
+            if (onError) {
               onError(err);
             }
           }
@@ -555,6 +568,10 @@ export function subscribeToOrders(
         notify();
       },
       (err) => {
+        const errStr = String(err?.message || '').toLowerCase();
+        if (err?.code === 'cancelled' || errStr.includes('cancelled') || errStr.includes('idle stream')) {
+          return;
+        }
         if (onError) onError(err);
       }
     );

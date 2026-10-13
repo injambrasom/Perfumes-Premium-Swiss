@@ -19,10 +19,13 @@ import {
   HelpCircle,
   AlertCircle,
   ExternalLink,
-  Loader2
+  Loader2,
+  Zap,
+  Package
 } from 'lucide-react';
 import { CartItem, Order } from '../types';
 import { deductStockInFirebase, saveOrderToFirebase, updateOrderStatusInFirebase } from '../lib/firebase';
+import { calculateShippingOptions, inferStateFromCep, ShippingOption, ShippingService } from '../utils/shipping';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -219,6 +222,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     total: number;
     subtotal: number;
     shipping: number;
+    shippingMethod?: ShippingService;
+    shippingDeadline?: string;
     discount: number;
     paymentMethod: PaymentMethod;
     installmentLabel: string;
@@ -246,7 +251,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     complement: '',
     neighborhood: '',
     city: '',
-    state: 'RS',
+    state: '',
     cardNumber: '',
     cardName: '',
     cardExpiry: '',
@@ -254,14 +259,37 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     installments: '1',
   });
 
+  const [shippingMethod, setShippingMethod] = useState<ShippingService>('PAC');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [orderId, setOrderId] = useState('');
   const [isSearchingCep, setIsSearchingCep] = useState(false);
   const [cepErrorMsg, setCepErrorMsg] = useState<string | null>(null);
 
-  // Discount for PIX (5% OFF)
-  const pixDiscount = paymentMethod === 'pix' ? subtotal * 0.05 : 0;
-  const finalTotal = Math.max(0, total - pixDiscount);
+  // Total quantity of items in cart for weight calculation
+  const totalItemCount = React.useMemo(() => {
+    return items.reduce((acc, curr) => acc + (curr.quantity || 1), 0);
+  }, [items]);
+
+  const cleanCep = formData.cep.replace(/\D/g, '');
+  const isCepComplete = cleanCep.length === 8;
+
+  // Real-time shipping options based on regional matrix (PAC & Sedex)
+  const shippingOptions = React.useMemo<ShippingOption[]>(() => {
+    const target = formData.state || cleanCep;
+    if (!target && !isCepComplete) return [];
+    return calculateShippingOptions(target, totalItemCount);
+  }, [formData.state, cleanCep, isCepComplete, totalItemCount]);
+
+  const selectedShippingOption = React.useMemo(() => {
+    if (shippingOptions.length === 0) return null;
+    return shippingOptions.find(opt => opt.id === shippingMethod) || shippingOptions[0];
+  }, [shippingOptions, shippingMethod]);
+
+  const activeShippingCost = selectedShippingOption ? selectedShippingOption.price : (freightCost || 0);
+
+  // Discount for PIX (5% OFF on subtotal)
+  const pixDiscount = paymentMethod === 'pix' ? Number((subtotal * 0.05).toFixed(2)) : 0;
+  const finalTotal = Math.max(0, Number((subtotal + activeShippingCost - pixDiscount).toFixed(2)));
 
   useEffect(() => {
     if (isOpen) {
@@ -605,6 +633,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     handleInputChange('cep', v);
 
     if (cleanDigits.length === 8) {
+      const deducedState = inferStateFromCep(cleanDigits);
+      if (deducedState) {
+        setFormData((prev) => ({ ...prev, state: prev.state || deducedState }));
+      }
       searchCepAddress(cleanDigits);
     } else {
       setCepErrorMsg(null);
@@ -726,8 +758,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setMpError(null);
 
     const currentOrderId = orderId || `SWISS-${Math.floor(10000 + Math.random() * 90000)}`;
-    const snapshotDiscount = paymentMethod === 'pix' ? (subtotal * 0.05) : 0;
-    const snapshotTotal = Math.max(0, (subtotal + freightCost) - snapshotDiscount);
+    const snapshotDiscount = paymentMethod === 'pix' ? Number((subtotal * 0.05).toFixed(2)) : 0;
+    const snapshotShipping = activeShippingCost;
+    const snapshotTotal = Math.max(0, Number((subtotal + snapshotShipping - snapshotDiscount).toFixed(2)));
     const snapshotItems = [...items];
     const instInfo = getInstallmentInfo(formData.installments);
 
@@ -736,7 +769,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       orderId: currentOrderId,
       total: snapshotTotal,
       subtotal: subtotal,
-      shipping: freightCost,
+      shipping: snapshotShipping,
+      shippingMethod: shippingMethod,
+      shippingDeadline: selectedShippingOption?.deadlineText,
       discount: snapshotDiscount,
       paymentMethod: paymentMethod,
       installmentLabel: paymentMethod === 'credit_card' ? instInfo.label : 'PIX com 5% de Desconto',
@@ -779,7 +814,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         image: i.product.image
       })),
       subtotal: subtotal,
-      shipping: freightCost,
+      shipping: snapshotShipping,
+      shippingMethod: shippingMethod,
+      shippingDeadline: selectedShippingOption?.deadlineText,
       discount: snapshotDiscount,
       total: snapshotTotal,
       paymentMethod: paymentMethod,
@@ -824,7 +861,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               quantity: i.quantity,
               price: i.selectedPrice
             })),
-            freightCost: freightCost,
+            freightCost: snapshotShipping,
+            shippingMethod: shippingMethod,
             transaction_amount: snapshotTotal,
             description: `Perfumes Premium Swiss - Pedido ${currentOrderId}`,
             payer: {
@@ -928,7 +966,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               quantity: i.quantity,
               price: i.selectedPrice
             })),
-            freightCost: freightCost,
+            freightCost: snapshotShipping,
+            shippingMethod: shippingMethod,
             installments: parseInt(formData.installments || '1', 10),
             transaction_amount: snapshotTotal,
             description: `Perfumes Premium Swiss - Pedido ${currentOrderId}`,
@@ -1044,6 +1083,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       ? (submittedOrderInfo?.installmentLabel || getInstallmentInfo(formData.installments).label)
       : 'PIX (Aprovado/Comprovante)';
 
+    const activeShipping = submittedOrderInfo?.shipping !== undefined ? submittedOrderInfo.shipping : activeShippingCost;
+    const activeShippingMethod = submittedOrderInfo?.shippingMethod || shippingMethod;
+    const activeDeadline = submittedOrderInfo?.shippingDeadline || selectedShippingOption?.deadlineText;
+    const shippingLine = `*Frete / Envio:* ${activeShippingMethod} (R$ ${activeShipping.toFixed(2).replace('.', ',')}${activeDeadline ? ` - Prazo: ${activeDeadline}` : ''})\n`;
+
     const message = `*NOVO PEDIDO DIRECT - PERFUMES PREMIUM SWISS*\n\n` +
       `*Número do Pedido:* ${activeOrderId}\n` +
       `*Cliente:* ${activeName}\n` +
@@ -1055,6 +1099,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       `${formData.neighborhood || ''} - ${activeCity}/${activeState} - CEP ${activeCep}\n\n` +
       `*Itens do Pedido:*\n${itemsList}\n\n` +
       `*Forma de Pagamento:* ${installmentPlan}\n` +
+      `${shippingLine}` +
       `*Total do Pedido:* R$ ${activeTotal.toFixed(2).replace('.', ',')}\n\n` +
       `Gostaria de acompanhar o envio e código de rastreio!`;
 
@@ -1235,9 +1280,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     </div>
                   )}
                   <div className="flex justify-between text-neutral-600">
-                    <span>Frete:</span>
-                    <span className="font-mono text-emerald-600">
-                      {freightCost === 0 ? 'GRÁTIS' : `R$ ${freightCost.toFixed(2).replace('.', ',')}`}
+                    <span>Frete ({selectedShippingOption ? selectedShippingOption.name : 'Correios'}):</span>
+                    <span className="font-mono text-neutral-900 font-medium">
+                      {isCepComplete || formData.state
+                        ? `R$ ${activeShippingCost.toFixed(2).replace('.', ',')}`
+                        : 'A calcular'}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm font-semibold text-neutral-900 pt-1 border-t border-neutral-200">
@@ -1448,6 +1495,90 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* Opções de Frete (PAC e Sedex) Estilo Mercado Livre */}
+                <div className="mt-4 pt-3.5 border-t border-neutral-200">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <label className="text-xs font-semibold text-neutral-900 flex items-center gap-1.5">
+                      <Truck className="w-4 h-4 text-[#C5A059]" />
+                      <span>Forma de Envio &amp; Prazo de Entrega</span>
+                    </label>
+                    {(formData.state || isCepComplete) && (
+                      <span className="text-[11px] text-neutral-500 font-medium bg-neutral-100 px-2 py-0.5 rounded">
+                        {formData.city ? `${formData.city} / ${formData.state}` : `Destino: ${formData.state || 'Brasil'}`}
+                      </span>
+                    )}
+                  </div>
+
+                  {shippingOptions.length === 0 ? (
+                    <div className="p-3.5 bg-neutral-50 rounded-xl border border-dashed border-neutral-300 flex items-center gap-3">
+                      <Package className="w-5 h-5 text-neutral-400 shrink-0" />
+                      <p className="text-xs text-neutral-600 leading-snug">
+                        Digite seu <strong>CEP</strong> no campo acima para calcular o valor e o prazo de entrega para sua região.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {shippingOptions.map((opt) => {
+                          const isSelected = shippingMethod === opt.id;
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => setShippingMethod(opt.id)}
+                              className={`w-full text-left p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between ${
+                                isSelected
+                                  ? 'border-[#C5A059] bg-[#C5A059]/5 ring-2 ring-[#C5A059]/30 shadow-xs'
+                                  : 'border-neutral-200 hover:border-neutral-300 bg-white'
+                              }`}
+                            >
+                              <div>
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                                      isSelected ? 'border-[#C5A059] bg-[#C5A059]' : 'border-neutral-300 bg-white'
+                                    }`}>
+                                      {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                    </div>
+                                    <span className="font-sans text-xs font-bold text-neutral-900">
+                                      {opt.name}
+                                    </span>
+                                  </div>
+                                  <span className={`text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded ${
+                                    opt.id === 'Sedex'
+                                      ? 'bg-amber-100 text-amber-800'
+                                      : 'bg-emerald-100 text-emerald-800'
+                                  }`}>
+                                    {opt.badge}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-neutral-500 pl-6 leading-tight">
+                                  {opt.description}
+                                </p>
+                              </div>
+
+                              <div className="pt-2 mt-2 border-t border-neutral-100 flex items-center justify-between text-xs pl-6">
+                                <span className="text-[11px] text-neutral-600 flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-[#C5A059] shrink-0" />
+                                  <span>{opt.deadlineText}</span>
+                                </span>
+                                <span className="font-mono font-bold text-neutral-900">
+                                  R$ {opt.price.toFixed(2).replace('.', ',')}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <p className="text-[10px] text-neutral-500 flex items-center gap-1 pt-1">
+                        <ShieldCheck className="w-3 h-3 text-emerald-600 shrink-0" />
+                        <span>Envio com seguro e código de rastreamento enviado via WhatsApp.</span>
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1899,6 +2030,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     <span className="text-neutral-500">Entrega para:</span>
                     <span className="font-medium text-right max-w-[200px] truncate">
                       {submittedOrderInfo?.street || formData.street}, {submittedOrderInfo?.number || formData.number} - {submittedOrderInfo?.city || formData.city}/{submittedOrderInfo?.state || formData.state}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-500">Frete Escolhido:</span>
+                    <span className="font-medium text-right text-neutral-800">
+                      {submittedOrderInfo?.shippingMethod || shippingMethod} (R$ {(submittedOrderInfo?.shipping !== undefined ? submittedOrderInfo.shipping : activeShippingCost).toFixed(2).replace('.', ',')})
                     </span>
                   </div>
                   <div className="flex justify-between">

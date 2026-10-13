@@ -754,7 +754,9 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ isOpen, onCl
                           </div>
 
                           <div className="flex items-center justify-between pt-3 mt-2 border-t border-neutral-800 text-xs">
-                            <span className="text-neutral-400">Frete: {order.shipping > 0 ? `R$ ${order.shipping.toFixed(2)}` : 'Grátis'}</span>
+                            <span className="text-neutral-400">
+                              Frete: {order.shippingMethod ? `${order.shippingMethod} (R$ ${order.shipping.toFixed(2).replace('.', ',')})` : (order.shipping > 0 ? `R$ ${order.shipping.toFixed(2).replace('.', ',')}` : 'R$ 0,00')}
+                            </span>
                             <div className="text-right">
                               <span className="text-neutral-400 text-xs mr-2">Total Pago:</span>
                               <span className="font-serif text-base font-bold text-[#E0C078]">

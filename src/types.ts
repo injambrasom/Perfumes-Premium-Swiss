@@ -144,6 +144,8 @@ export interface Order {
   items: OrderItem[];
   subtotal: number;
   shipping: number;
+  shippingMethod?: 'PAC' | 'Sedex';
+  shippingDeadline?: string;
   discount: number;
   total: number;
   paymentMethod: PaymentMethod;
