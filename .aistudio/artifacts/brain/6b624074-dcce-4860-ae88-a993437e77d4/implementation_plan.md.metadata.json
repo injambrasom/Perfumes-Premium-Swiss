@@ -1,6 +1,0 @@
-{
-  "summary": "Plano de implementação para cálculo e seleção de frete (PAC e Sedex por região/UF) na etapa de endereço do checkout, com prazos estimados e atualização em tempo real do total do pedido no Mercado Pago e Firestore.",
-  "updatedAt": "2026-10-13T01:23:37.204314126Z",
-  "requestFeedback": true,
-  "userFacing": true
-}

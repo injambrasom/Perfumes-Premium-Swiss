@@ -26,6 +26,7 @@ import {
 import { CartItem, Order } from '../types';
 import { deductStockInFirebase, saveOrderToFirebase, updateOrderStatusInFirebase } from '../lib/firebase';
 import { calculateShippingOptions, inferStateFromCep, ShippingOption, ShippingService } from '../utils/shipping';
+import { getProductImageUrl, handleImageError } from '../utils/imageHelper';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -426,11 +427,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               quantity: i.quantity || 1
             }));
 
-            deductStockInFirebase(formattedItems).catch(() => {});
+            deductStockInFirebase(formattedItems, {
+              customer: restoredOrder.customer,
+              paymentMethod: restoredOrder.paymentMethod || 'credit_card',
+              orderId: restoredOrder.id || returnOrderId
+            }).catch(() => {});
             fetch('/api/inventory/deduct', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ items: formattedItems })
+              body: JSON.stringify({ 
+                items: formattedItems,
+                customer: restoredOrder.customer,
+                paymentMethod: restoredOrder.paymentMethod || 'credit_card',
+                orderId: restoredOrder.id || returnOrderId
+              })
             }).catch(() => {});
 
             updateOrderStatusInFirebase(restoredOrder.id || returnOrderId, 'pago').catch(() => {});
@@ -1024,14 +1034,39 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         size: (i.selectedSize || '100ml') as '15ml' | '55ml' | '100ml',
         quantity: i.quantity
       }));
+      const activeCustomer = {
+        name: submittedOrderInfo?.name || formData.name || 'Cliente Loja Online',
+        phone: submittedOrderInfo?.phone || formData.phone || '',
+        email: submittedOrderInfo?.email || formData.email || ''
+      };
+      const activeOrderId = submittedOrderInfo?.orderId || orderId;
+
       // 1. Deduct in Firebase Firestore (Real-time sync to desktop & mobile)
-      await deductStockInFirebase(formattedItems);
+      await deductStockInFirebase(
+        formattedItems.map(item => {
+          const matchedCartItem = activeItems.find(ai => ai.product.id === item.productId);
+          return {
+            ...item,
+            price: matchedCartItem?.selectedPrice
+          };
+        }),
+        {
+          customer: activeCustomer,
+          paymentMethod: 'pix',
+          orderId: activeOrderId
+        }
+      );
 
       // 2. Deduct in local server API
       await fetch('/api/inventory/deduct', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: formattedItems })
+        body: JSON.stringify({ 
+          items: formattedItems,
+          customer: activeCustomer,
+          paymentMethod: 'pix',
+          orderId: activeOrderId
+        })
       });
     } catch (err) {
       console.error('Failed to deduct stock:', err);
@@ -1249,9 +1284,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     <div key={idx} className="py-2.5 flex items-center justify-between text-xs gap-3">
                       <div className="flex items-center gap-3">
                         <img 
-                          src={item.product.image}
+                          src={getProductImageUrl(item.product.image)}
                           alt={item.product.name}
+                          decoding="async"
                           className="w-10 h-10 object-cover rounded border border-neutral-200 bg-neutral-100 shrink-0"
+                          onError={(e) => handleImageError(e, item.product.image)}
                         />
                         <div>
                           <p className="font-serif font-semibold text-neutral-900">{item.product.name}</p>

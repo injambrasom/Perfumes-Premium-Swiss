@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Check, Plus, X, ShoppingBag, MessageCircle, Package, RefreshCw, Star, ShieldCheck, Gift } from 'lucide-react';
 import { FragranceProduct, BottleSize } from '../types';
-import { handleImageError } from '../utils/imageHelper';
+import { handleImageError, getProductImageUrl } from '../utils/imageHelper';
 import blackGoldMarbleBg from '../assets/images/black_gold_marble_bg_1786232675565.jpg';
 
 interface TrioBundleBuilderProps {
@@ -187,8 +187,9 @@ export const TrioBundleBuilder: React.FC<TrioBundleBuilderProps> = ({
                         className="absolute inset-0 w-full h-full object-cover opacity-60 pointer-events-none"
                       />
                       <img
-                        src={product.image}
+                        src={getProductImageUrl(product.image)}
                         alt={product.name}
+                        decoding="async"
                         className="w-full h-full object-contain relative z-1 drop-shadow-md scale-105"
                         onError={(e) => handleImageError(e, product.image)}
                       />
@@ -364,8 +365,10 @@ export const TrioBundleBuilder: React.FC<TrioBundleBuilderProps> = ({
                         className="absolute inset-0 w-full h-full object-cover opacity-60 pointer-events-none"
                       />
                       <img
-                        src={product.image}
+                        src={getProductImageUrl(product.image)}
                         alt={product.name}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-contain transform group-hover:scale-105 transition-transform relative z-1"
                         onError={(e) => handleImageError(e, product.image)}
                       />

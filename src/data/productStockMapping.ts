@@ -86,7 +86,7 @@ export const PRODUCT_STOCK_MAPPINGS: StockMappingEntry[] = [
   // 37. Invictus Victory masc
   { siteProductId: 'swiss-53-invictus-victory', stockAppName: 'Invictus Victory masc', aliases: ['invictus-victory', 'inviktus victory'] },
   // 38. Issey Miyake masc
-  { siteProductId: 'swiss-07-issey-miyake', stockAppName: 'IIssey Miyake masc', aliases: ['issey-miyake', 'issey miyake'] },
+  { siteProductId: 'swiss-07-issey-miyake', stockAppName: 'Issey Miyake masc', aliases: ['issey-miyake', 'issey miyake', 'p-issey-miyake', 'IIssey Miyake masc'] },
   // 39. J'adore fem
   { siteProductId: 'swiss-15-jadore', stockAppName: 'J\'adore fem', aliases: ['jadore', 'j\'ador', 'j\'adore'] },
   // 40. Jack Daniel’s masc
@@ -164,7 +164,17 @@ export const PRODUCT_STOCK_MAPPINGS: StockMappingEntry[] = [
   // 76. Kouros masc
   { siteProductId: 'swiss-69-kouros', stockAppName: 'Kouros masc', aliases: ['kouros', 'couros'] },
   // 77. Lili fem
-  { siteProductId: 'swiss-26-lily', stockAppName: 'Lili fem', aliases: ['lily-essence', 'lili essense', 'lily essence', 'lili'] }
+  { siteProductId: 'swiss-26-lily', stockAppName: 'Lili fem', aliases: ['lily-essence', 'lili essense', 'lily essence', 'lili'] },
+  // 78. Sabatine (Gabriela Sabatini)
+  { siteProductId: 'swiss-36-gabriela-sabatini', stockAppName: 'Sabatine fem', aliases: ['sabatine', 'gabriela sabatini', 'sabatini'] },
+  // 79. Hypnose
+  { siteProductId: 'swiss-78-hypnose', stockAppName: 'Hypnôse fem', aliases: ['hypnose', 'hipnose', 'hypnôse'] },
+  // 80. CK One
+  { siteProductId: 'swiss-79-ck-one', stockAppName: 'CK One', aliases: ['ck one', 'ck-one', 'calvin klein one', '1784810720539'] },
+  // 81. Guchi Bloom fem
+  { siteProductId: 'swiss-80-gucci-bloom', stockAppName: 'Guchi Bloom fem', aliases: ['guchi bloom', 'gucci bloom', 'guchi blommm', '1771020763327'] },
+  // 82. Silver Scent masc
+  { siteProductId: 'swiss-81-silver-scent', stockAppName: 'Silver Scent masc', aliases: ['silver scent', 'silver cents', 'silver-scent', 'p-silver-scent'] }
 ];
 
 export function normalizeKey(str: string): string {

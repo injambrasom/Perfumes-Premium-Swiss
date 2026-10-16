@@ -42,6 +42,8 @@ export const InstagramGallery: React.FC = () => {
               <img 
                 src={post.image}
                 alt={post.title}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-contain object-center group-hover:scale-105 transition-transform duration-500 drop-shadow-xl"
                 onError={(e) => handleImageError(e, post.image)}
               />

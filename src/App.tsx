@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag } from 'lucide-react';
 import blackGoldMarbleBg from './assets/images/black_gold_marble_bg_1786232675565.jpg';
-const LOGO_IMAGE_URL = 'https://i.postimg.cc/FKSJcM7t/Chat-GPT-Image-8-de-ago-de-2026-21-14-16.png';
+const LOGO_IMAGE_URL = '/logo.webp';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { ReferenceSearchModal } from './components/ReferenceSearchModal';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Instagram, MessageCircle, ArrowUp, ShieldCheck, Award } from 'lucide-react';
-const LOGO_IMAGE_URL = 'https://i.postimg.cc/FKSJcM7t/Chat-GPT-Image-8-de-ago-de-2026-21-14-16.png';
+const LOGO_IMAGE_URL = '/logo.webp';
 
 interface FooterProps {
   onOpenSearch: () => void;

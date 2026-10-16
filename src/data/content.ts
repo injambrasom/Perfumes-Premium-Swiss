@@ -114,112 +114,112 @@ export interface RealFeedbackPrint {
 export const REAL_FEEDBACK_PRINTS: RealFeedbackPrint[] = [
   {
     id: 'fb-1',
-    image: 'https://i.postimg.cc/VvRJRMHP/feedback1.jpg',
-    fallbackUrl: 'https://i.postimg.cc/8f7kkFSZ/feedback1.jpg',
+    image: '/images/feedbacks/feedback1.webp',
+    fallbackUrl: '/images/feedbacks/feedback1.jpg',
     title: 'Feedback Cliente WhatsApp • Fixação e Qualidade',
     tag: 'Cliente Verificado',
     transcript: ''
   },
   {
     id: 'fb-2',
-    image: 'https://i.postimg.cc/hvrXrx3q/feedback2.jpg',
-    fallbackUrl: 'https://i.postimg.cc/y3D66JHf/feedback2.jpg',
+    image: '/images/feedbacks/feedback2.webp',
+    fallbackUrl: '/images/feedbacks/feedback2.jpg',
     title: 'Depoimento Perfume Premium Swiss',
     tag: 'Compra Confirmada',
     transcript: ''
   },
   {
     id: 'fb-3',
-    image: 'https://i.postimg.cc/mkwPwMpv/feedback3.jpg',
-    fallbackUrl: 'https://i.postimg.cc/CnRMMZg7/feedback3.jpg',
+    image: '/images/feedbacks/feedback3.webp',
+    fallbackUrl: '/images/feedbacks/feedback3.jpg',
     title: 'Avaliação de Desempenho Olfativo',
     tag: '100% Satisfeito',
     transcript: ''
   },
   {
     id: 'fb-4',
-    image: 'https://i.postimg.cc/pVY5RbV9/feedback4.jpg',
-    fallbackUrl: 'https://i.postimg.cc/dD3Vjfyv/feedback4.jpg',
+    image: '/images/feedbacks/feedback4.webp',
+    fallbackUrl: '/images/feedbacks/feedback4.jpg',
     title: 'Recomendação de Fragrâncias e Entrega',
     tag: 'Cliente Especial',
     transcript: ''
   },
   {
     id: 'fb-5',
-    image: 'https://i.postimg.cc/MZbfq2Zf/feedback5.jpg',
-    fallbackUrl: 'https://i.postimg.cc/23yS7tZC/feedback5.jpg',
+    image: '/images/feedbacks/feedback5.webp',
+    fallbackUrl: '/images/feedbacks/feedback5.jpg',
     title: 'Aprovação de Similaridade e Projeção',
     tag: 'Satisfação Garantida',
     transcript: ''
   },
   {
     id: 'fb-6',
-    image: 'https://i.postimg.cc/c1Mt0y1c/feedback6.jpg',
-    fallbackUrl: 'https://i.postimg.cc/dD3Vjfy7/feedback6.jpg',
+    image: '/images/feedbacks/feedback6.webp',
+    fallbackUrl: '/images/feedbacks/feedback6.jpg',
     title: 'Depoimento Real de Entrega & Embalagem',
     tag: 'Atendimento VIP',
     transcript: ''
   },
   {
     id: 'fb-8',
-    image: 'https://i.postimg.cc/MZbfq2Zd/feedback8.jpg',
-    fallbackUrl: 'https://i.postimg.cc/Yj0CzPWW/feedback8.jpg',
+    image: '/images/feedbacks/feedback8.webp',
+    fallbackUrl: '/images/feedbacks/feedback8.jpg',
     title: 'Experiência Olfativa Surpreendente',
     tag: 'Cliente Fiel',
     transcript: ''
   },
   {
     id: 'fb-9',
-    image: 'https://i.postimg.cc/c1Mt0y15/feedback9.jpg',
-    fallbackUrl: 'https://i.postimg.cc/bdrw95tQ/feedback9.jpg',
+    image: '/images/feedbacks/feedback9.webp',
+    fallbackUrl: '/images/feedbacks/feedback9.jpg',
     title: 'Feedback de Fixação Estendida na Pele',
     tag: 'Extrait de Parfum',
     transcript: ''
   },
   {
     id: 'fb-10',
-    image: 'https://i.postimg.cc/T2q5fM24/feedback10.jpg',
-    fallbackUrl: 'https://i.postimg.cc/grj2H7ZV/feedback10.jpg',
+    image: '/images/feedbacks/feedback10.webp',
+    fallbackUrl: '/images/feedbacks/feedback10.jpg',
     title: 'Elogios de Terceiros ao Usar Premium Swiss',
     tag: 'Presença Marcante',
     transcript: ''
   },
   {
     id: 'fb-11',
-    image: 'https://i.postimg.cc/SNS2KTjZ/feedback11.jpg',
-    fallbackUrl: 'https://i.postimg.cc/c6z49cRY/feedback11.jpg',
+    image: '/images/feedbacks/feedback11.webp',
+    fallbackUrl: '/images/feedbacks/feedback11.jpg',
     title: 'Avaliação da Coleção Árabe e Nicho',
     tag: 'Coleção Exclusiva',
     transcript: ''
   },
   {
     id: 'fb-12',
-    image: 'https://i.postimg.cc/8PpJCKjV/feedback12.jpg',
-    fallbackUrl: 'https://i.postimg.cc/9zkF8Bdx/feedback12.jpg',
+    image: '/images/feedbacks/feedback12.webp',
+    fallbackUrl: '/images/feedbacks/feedback12.jpg',
     title: 'Recompra e Indicação para Amigos',
     tag: 'Indicação Real',
     transcript: ''
   },
   {
     id: 'fb-13',
-    image: 'https://i.postimg.cc/m2LzrXtB/feedback13.jpg',
-    fallbackUrl: 'https://i.postimg.cc/yWGYQTmb/feedback13.jpg',
+    image: '/images/feedbacks/feedback13.webp',
+    fallbackUrl: '/images/feedbacks/feedback13.jpg',
     title: 'Qualidade do Borrifador e Concentração',
     tag: 'Padrão Suíço',
     transcript: ''
   },
   {
     id: 'fb-14',
-    image: 'https://i.postimg.cc/L69YsCn9/feedback14.jpg',
-    fallbackUrl: 'https://i.postimg.cc/w3rTfkXZ/feedback14.jpg',
+    image: '/images/feedbacks/feedback14.webp',
+    fallbackUrl: '/images/feedbacks/feedback14.jpg',
     title: 'Satisfação Total com a Linha Masculina e Feminina',
     tag: 'Nota 5/5',
     transcript: ''
   },
   {
     id: 'fb-main',
-    image: 'https://i.postimg.cc/GtQ4QYSw/feedback.jpg',
-    fallbackUrl: 'https://i.postimg.cc/MfnZZcSd/feedback.jpg',
+    image: '/images/feedbacks/feedback.webp',
+    fallbackUrl: '/images/feedbacks/feedback.jpg',
     title: 'Atendimento e Consultoria Personalizada',
     tag: 'Atendimento Humanizado',
     transcript: ''
@@ -272,25 +272,25 @@ export const TESTIMONIALS: Testimonial[] = [
 export const INSTAGRAM_POSTS = [
   {
     id: 'ig-1',
-    image: 'https://i.postimg.cc/T5bJKMZg/BACCARAT.png',
+    image: '/images/BACCARAT.webp',
     title: 'Baccarat Swiss • Concentração Extrait 36% com rastro magnético.',
     likes: '1.420'
   },
   {
     id: 'ig-2',
-    image: 'https://i.postimg.cc/hzgP6HB3/Aliem-Swiss-(2).png',
+    image: '/images/Aliem-Swiss-(2).webp',
     title: 'Aliem Swiss • Jasmin Sambac exuberante e âmbar branco mineral.',
     likes: '2.180'
   },
   {
     id: 'ig-3',
-    image: 'https://i.postimg.cc/NKD79xPk/SALVAGE.png',
+    image: '/images/SALVAGE.webp',
     title: 'Salvage Swiss • Bergamota da Calábria e notas amadeiradas de pimenta.',
     likes: '1.950'
   },
   {
     id: 'ig-4',
-    image: 'https://i.postimg.cc/n9mGXb6c/ASAD-BOURBON.jpg',
+    image: '/images/ASAD-BOURBON.webp',
     title: 'Asad Bourbon • Especiarias orientais nobres e baunilha licorosa.',
     likes: '3.040'
   }

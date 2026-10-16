@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Search, ShoppingBag, Menu, X, Sparkles, ChevronRight, MessageCircle } from 'lucide-react';
 import { ANNOUNCEMENT_MESSAGES } from '../data/content';
 import { SwissFlagIcon, FranceFlagIcon } from './CountryFlags';
-const LOGO_IMAGE_URL = 'https://i.postimg.cc/FKSJcM7t/Chat-GPT-Image-8-de-ago-de-2026-21-14-16.png';
+const LOGO_IMAGE_URL = '/logo.webp';
 
 interface HeaderProps {
   onOpenSearch: () => void;

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Search, X, Sparkles, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { PRODUCTS, REFERENCE_PERFUMES_LIST } from '../data/products';
 import { FragranceProduct } from '../types';
-import { handleImageError } from '../utils/imageHelper';
+import { handleImageError, getProductImageUrl } from '../utils/imageHelper';
 
 interface ReferenceSearchModalProps {
   isOpen: boolean;
@@ -166,8 +166,9 @@ export const ReferenceSearchModal: React.FC<ReferenceSearchModalProps> = ({
                   >
                     <div className="flex items-center gap-4 w-full sm:w-auto">
                       <img 
-                        src={product.image}
+                        src={getProductImageUrl(product.image)}
                         alt={product.name}
+                        decoding="async"
                         className="w-20 h-20 object-contain p-1 bg-neutral-50 border border-neutral-100 shrink-0"
                         onError={(e) => handleImageError(e, product.image)}
                       />

@@ -86,7 +86,7 @@ export const Hero: React.FC<HeroProps> = ({
       subtitle: 'Escolha 3 frascos de 15ml com 36% de concentração e leve sua assinatura para onde quiser.',
       tagline: 'Apenas R$ 29,96 por unidade',
       priceText: 'De R$ 135,00 por R$ 89,90 (3x 15ml)',
-      imageUrl: 'https://i.postimg.cc/prj0ymzT/Trio-de-Bolso.jpg',
+      imageUrl: '/images/Trio-de-Bolso.webp',
       ctaText: 'MONTAR MEU TRIO DE BOLSO',
       ctaType: 'trio',
     },
@@ -100,7 +100,7 @@ export const Hero: React.FC<HeroProps> = ({
       subtitle: 'Uma obra-prima mineral e ambarada com açafrão dourado e âmbar cinzento radiante.',
       tagline: '36% de Essência Pura • Extrait de Parfum',
       priceText: 'R$ 130,00',
-      imageUrl: 'https://i.postimg.cc/BvnZXBCw/Banner-Baccarat.jpg',
+      imageUrl: '/images/Banner-Baccarat.webp',
       ctaText: 'VER BACCARAT EM DETALHES',
       ctaType: 'product',
       productId: baccarat?.id || 'swiss-03-baccarat',
@@ -115,7 +115,7 @@ export const Hero: React.FC<HeroProps> = ({
       subtitle: 'O frescor selvagem da pimenta de Sichuan e bergamota com a potência do ambroxan.',
       tagline: 'Fixação estimada de 8h a 12h+ na pele',
       priceText: 'R$ 130,00',
-      imageUrl: 'https://i.postimg.cc/rpb3mX3Q/banner-salvage.jpg',
+      imageUrl: '/images/banner-salvage.webp',
       ctaText: 'COMPRAR SALVAGE',
       ctaType: 'product',
       productId: salvage?.id || 'swiss-04-sauvage',
@@ -130,7 +130,7 @@ export const Hero: React.FC<HeroProps> = ({
       subtitle: 'Jasmin Sambac da Índia radiante enriquecido por madeira de cashmeran e âmbar branco.',
       tagline: 'Fragrância marcante e inesquecível',
       priceText: 'R$ 130,00',
-      imageUrl: 'https://i.postimg.cc/Gpm3Hxj5/Banner-Aliem.jpg',
+      imageUrl: '/images/Banner-Aliem.webp',
       ctaText: 'COMPRAR ALIEM',
       ctaType: 'product',
       productId: aliem?.id || 'swiss-13-aliem',
@@ -273,6 +273,8 @@ export const Hero: React.FC<HeroProps> = ({
                 <img
                   src={currentSlide.imageUrl}
                   alt={currentSlide.title}
+                  fetchPriority="high"
+                  decoding="async"
                   className="w-full h-full object-contain sm:object-cover object-center transition-transform duration-700 group-hover:scale-[1.008] block"
                 />
 

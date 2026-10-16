@@ -69,6 +69,8 @@ export const CategoryShowcase: React.FC<CategoryShowcaseProps> = ({ onSelectCate
               <img 
                 src={card.image}
                 alt={card.title}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover object-center filter grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700 opacity-60 group-hover:opacity-80"
                 onError={(e) => handleImageError(e, card.image)}
               />

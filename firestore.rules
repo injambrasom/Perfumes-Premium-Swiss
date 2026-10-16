@@ -38,6 +38,12 @@ service cloud.firestore {
     match /items/{itemId} {
       allow read, write: if true;
     }
+    match /sales/{saleId} {
+      allow read, write: if true;
+    }
+    match /vendas/{vendaId} {
+      allow read, write: if true;
+    }
 
     // Orders: creation, read, and status updates permitted for checkout and webhooks
     match /orders/{orderId} {

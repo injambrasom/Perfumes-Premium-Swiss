@@ -263,7 +263,7 @@ export function subscribeToInventory(
 ): () => void {
   seedInitialInventoryIfEmpty().catch(() => {});
 
-  const candidateCollections = ['inventory', 'produtos', 'estoque'];
+  const candidateCollections = ['perfumes', 'inventory', 'produtos', 'estoque'];
   const unsubscribes: Array<() => void> = [];
   const accumMap: InventoryStoreMap = {};
 
@@ -277,24 +277,37 @@ export function subscribeToInventory(
             let hasChanges = false;
             snapshot.forEach((docSnap) => {
               const data = docSnap.data();
+              // Ignore deleted records from stock app
+              if (data.deleted === true) return;
+
               const docName = docSnap.id;
 
               const targetProductIds = [
                 ...resolveAllSiteProductIds(docName),
-                ...resolveAllSiteProductIds(data.name || data.nome || data.produto || data.title || '')
+                ...resolveAllSiteProductIds(data.name || data.nome || data.produto || data.title || ''),
+                ...resolveAllSiteProductIds(data.reference || data.referenceName || '')
               ].filter((v, i, a) => a.indexOf(v) === i);
 
-              const q15 = extractQuantity(data, KEYS_15ML);
-              const q55 = extractQuantity(data, KEYS_55ML);
-              const q100 = extractQuantity(data, KEYS_100ML);
+              // Extract quantities (support both stock15ml format from perfumes and 15ml format from inventory)
+              const q15 = data.stock15ml !== undefined && data.stock15ml !== null
+                ? Number(data.stock15ml)
+                : extractQuantity(data, KEYS_15ML);
+
+              const q55 = data.stock55ml !== undefined && data.stock55ml !== null
+                ? Number(data.stock55ml)
+                : extractQuantity(data, KEYS_55ML);
+
+              const q100 = data.stock100ml !== undefined && data.stock100ml !== null
+                ? Number(data.stock100ml)
+                : extractQuantity(data, KEYS_100ML);
 
               if (q15 !== undefined || q55 !== undefined || q100 !== undefined) {
                 targetProductIds.forEach((targetProductId) => {
                   const current = accumMap[targetProductId] || { '15ml': 0, '55ml': 0, '100ml': 0 };
                   accumMap[targetProductId] = {
-                    '15ml': q15 !== undefined ? q15 : current['15ml'],
-                    '55ml': q55 !== undefined ? q55 : current['55ml'],
-                    '100ml': q100 !== undefined ? q100 : current['100ml']
+                    '15ml': q15 !== undefined && !isNaN(q15) ? q15 : current['15ml'],
+                    '55ml': q55 !== undefined && !isNaN(q55) ? q55 : current['55ml'],
+                    '100ml': q100 !== undefined && !isNaN(q100) ? q100 : current['100ml']
                   };
                 });
                 hasChanges = true;
@@ -374,6 +387,9 @@ export function subscribeToInventory(
 /**
  * Update stock for a specific product in Firestore and Realtime DB
  */
+/**
+ * Update stock for a specific product in Firestore and Realtime DB
+ */
 export async function updateProductStockInFirebase(
   productId: string,
   stock: ProductStockData
@@ -384,11 +400,14 @@ export async function updateProductStockInFirebase(
       '15ml': stock['15ml'],
       '55ml': stock['55ml'],
       '100ml': stock['100ml'],
+      stock15ml: stock['15ml'],
+      stock55ml: stock['55ml'],
+      stock100ml: stock['100ml'],
       updatedAt: new Date().toISOString()
     };
 
     allFirestoreInstances.forEach((activeDb) => {
-      ['inventory', 'produtos', 'estoque', 'products'].forEach(async (colName) => {
+      ['perfumes', 'inventory', 'produtos', 'estoque', 'products'].forEach(async (colName) => {
         try {
           const docRef = doc(activeDb, colName, productId);
           await setDoc(docRef, payload, { merge: true });
@@ -416,16 +435,97 @@ export async function updateProductStockInFirebase(
 }
 
 /**
- * Deduct stock when an order is completed
+ * Deduct stock when an order is completed, sync to perfumes collection and record in sales
  */
 export async function deductStockInFirebase(
-  items: Array<{ productId: string; size: '15ml' | '55ml' | '100ml'; quantity: number }>
+  items: Array<{ productId: string; size: '15ml' | '55ml' | '100ml'; quantity: number; price?: number }>,
+  orderDetails?: {
+    customer?: { name?: string; phone?: string; email?: string };
+    paymentMethod?: string;
+    orderId?: string;
+  }
 ): Promise<void> {
   try {
+    // 1. Fetch current perfumes collection from Firestore to locate exact matching docs
+    const perfumesColRef = collection(db, 'perfumes');
+    const perfumesSnap = await getDocs(perfumesColRef).catch(() => null);
+
     for (const item of items) {
       if (!item.productId || !item.size) continue;
       const stockAppName = getStockAppName(item.productId);
+      const sizeKey = item.size === '15ml' ? 'stock15ml' : item.size === '55ml' ? 'stock55ml' : 'stock100ml';
 
+      let matchedPerfumeDocId: string | null = null;
+      let matchedPerfumeName: string | null = null;
+      let unitCost = item.size === '15ml' ? 10 : item.size === '55ml' ? 30 : 42;
+
+      // Deduct from perfumes collection (primary stock app source)
+      if (perfumesSnap && !perfumesSnap.empty) {
+        for (const pDoc of perfumesSnap.docs) {
+          const pData = pDoc.data();
+          if (pData.deleted === true) continue;
+          const candidateIds = [
+            ...resolveAllSiteProductIds(pDoc.id),
+            ...resolveAllSiteProductIds(pData.name || '')
+          ];
+          if (candidateIds.includes(item.productId)) {
+            matchedPerfumeDocId = pDoc.id;
+            matchedPerfumeName = pData.name || stockAppName;
+            if (pData[`cost${item.size}`]) {
+              unitCost = Number(pData[`cost${item.size}`]);
+            }
+
+            const currentStock = Number(pData[sizeKey] ?? pData[item.size] ?? 0);
+            const newStock = Math.max(0, currentStock - item.quantity);
+
+            try {
+              await updateDoc(doc(db, 'perfumes', pDoc.id), {
+                [sizeKey]: newStock,
+                [item.size]: newStock,
+                updatedAt: new Date().toISOString()
+              });
+              console.log(`[DEDUCT PERFUMES] Deducted ${item.quantity} of ${item.size} on ${pDoc.id} (${pData.name}). Remaining: ${newStock}`);
+            } catch (err) {
+              console.warn('[DEDUCT PERFUMES ERROR]:', err);
+            }
+            break;
+          }
+        }
+      }
+
+      // 2. Register sale in `sales` collection so it shows immediately in the stock app
+      try {
+        const saleDocId = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const unitPrice = item.price || (item.size === '15ml' ? 35 : item.size === '55ml' ? 80 : 130);
+        const saleDoc = {
+          id: saleDocId,
+          customerName: orderDetails?.customer?.name || 'Cliente Loja Online',
+          customerPhone: orderDetails?.customer?.phone || '',
+          productId: matchedPerfumeDocId || item.productId,
+          perfumeId: matchedPerfumeDocId || item.productId,
+          productName: matchedPerfumeName || stockAppName,
+          productCategory: 'Perfume',
+          size: item.size,
+          quantity: item.quantity,
+          unitPrice,
+          unitCost,
+          totalAmount: unitPrice * item.quantity,
+          paymentMethod: orderDetails?.paymentMethod === 'credit_card' ? 'Cartão de Crédito' : 'Pix',
+          type: 'Varejo',
+          status: 'pago',
+          storeId: 'swiss_master_store',
+          date: new Date().toISOString(),
+          deleted: false,
+          origin: 'site_online',
+          orderId: orderDetails?.orderId || ''
+        };
+        await setDoc(doc(db, 'sales', saleDocId), saleDoc);
+        console.log(`[SALE RECORDED IN STOCK APP]: ${saleDoc.productName} (${saleDoc.size}) x${saleDoc.quantity}`);
+      } catch (err) {
+        console.warn('[RECORD SALE ERROR]:', err);
+      }
+
+      // 3. Deduct from inventory & outros collections for backward compatibility
       allFirestoreInstances.forEach(async (activeDb) => {
         ['inventory', 'produtos', 'estoque'].forEach(async (colName) => {
           try {

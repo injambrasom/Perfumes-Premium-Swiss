@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Star, ShoppingBag, MessageCircle, Sparkles, Plus, Minus, Compass } from 'lucide-react';
 import { FragranceProduct, BottleSize, BOTTLE_OPTIONS } from '../types';
-import { handleImageError } from '../utils/imageHelper';
+import { handleImageError, getProductImageUrl } from '../utils/imageHelper';
 import blackSilkTexture from '../assets/images/black_silk_texture_1786224830203.jpg';
 import blackGoldMarbleBg from '../assets/images/black_gold_marble_bg_1786232675565.jpg';
 
@@ -135,8 +135,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#C5A059]/20 via-transparent to-transparent opacity-70 pointer-events-none z-10" />
 
               <img 
-                src={product.image}
+                src={getProductImageUrl(product.image)}
                 alt={product.name}
+                decoding="async"
                 className="w-full h-full object-contain object-center mx-auto drop-shadow-[0_20px_40px_rgba(0,0,0,0.95)] z-0 transition-transform duration-700 hover:scale-[1.03] relative"
                 onError={(e) => handleImageError(e, product.image)}
               />

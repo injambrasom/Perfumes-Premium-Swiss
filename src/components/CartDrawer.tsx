@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, ShoppingBag, Trash2, Plus, Minus, ArrowRight, ArrowLeft, ShieldCheck, MessageCircle, CheckCircle2 } from 'lucide-react';
 import { CartItem } from '../types';
-import { handleImageError } from '../utils/imageHelper';
+import { handleImageError, getProductImageUrl } from '../utils/imageHelper';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -178,8 +178,9 @@ Aguardando confirmação do consultor executivo para envio imediato!`;
                     >
                       <div className="w-20 h-24 sm:w-22 sm:h-26 bg-neutral-900 rounded-md overflow-hidden p-1 shrink-0 flex items-center justify-center border border-[#C5A059]/30">
                         <img 
-                          src={item.product.image}
+                          src={getProductImageUrl(item.product.image)}
                           alt={item.product.name}
+                          decoding="async"
                           className="w-full h-full object-contain drop-shadow-md"
                           onError={(e) => handleImageError(e, item.product.image)}
                         />

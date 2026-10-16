@@ -77,32 +77,70 @@ export const POSTIMAGES_MAP: Record<string, string> = {
 };
 
 export function getProductImageUrl(imagePath?: string): string {
-  if (!imagePath) return 'https://i.postimg.cc/NKD79xPk/SALVAGE.png';
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+  if (!imagePath) return '/images/SALVAGE.webp';
+
+  // If already pointing to an internal webp or png asset, return as-is
+  if (imagePath.startsWith('/images/') || imagePath.startsWith('/feedbacks/') || imagePath.startsWith('/logo')) {
     return imagePath;
   }
-  const filename = imagePath.split('/').pop() || '';
-  if (POSTIMAGES_MAP[filename]) {
-    return POSTIMAGES_MAP[filename];
+
+  // Extract clean filename
+  const filename = decodeURIComponent(imagePath.split('/').pop()?.split('?')[0] || '');
+  if (!filename) return imagePath;
+
+  // Handle feedbacks
+  if (filename.toLowerCase().includes('feedback')) {
+    const base = filename.substring(0, filename.lastIndexOf('.')) || filename;
+    return `/images/feedbacks/${base}.webp`;
   }
-  const cleanFilename = filename.replace(/\(%20\)/g, '').replace(/\(2\)/g, '2');
-  if (POSTIMAGES_MAP[cleanFilename]) {
-    return POSTIMAGES_MAP[cleanFilename];
+
+  // Handle logo
+  if (filename.toLowerCase().includes('chat-gpt') || filename.toLowerCase().includes('logo')) {
+    return '/logo.webp';
   }
-  return imagePath;
+
+  // For products, get the base name without extension
+  const baseName = filename.substring(0, filename.lastIndexOf('.')) || filename;
+  const cleanBase = baseName.replace(/\(%20\)/g, '').replace(/%20/g, ' ');
+
+  // Return the high-performance local WebP format
+  return `/images/${cleanBase}.webp`;
 }
 
 export function handleImageError(e: React.SyntheticEvent<HTMLImageElement, Event>, originalPath?: string) {
   const target = e.currentTarget;
-  if (originalPath) {
-    const cdnUrl = getProductImageUrl(originalPath);
-    if (target.src !== cdnUrl) {
-      target.src = cdnUrl;
+  const currentSrc = target.src;
+
+  // 1. If WebP failed, try the local compressed PNG / JPG
+  if (currentSrc.endsWith('.webp')) {
+    const filename = decodeURIComponent(currentSrc.split('/').pop()?.split('?')[0] || '');
+    const baseName = filename.replace(/\.webp$/, '');
+
+    if (currentSrc.includes('/feedbacks/')) {
+      target.src = `/images/feedbacks/${baseName}.jpg`;
       return;
     }
+    target.src = `/images/${baseName}.png`;
+    return;
   }
-  // Ultimate fallback
-  if (target.src !== 'https://i.postimg.cc/NKD79xPk/SALVAGE.png') {
-    target.src = 'https://i.postimg.cc/NKD79xPk/SALVAGE.png';
+
+  // 2. If local PNG failed, try the remote CDN link from POSTIMAGES_MAP
+  const rawTargetName = decodeURIComponent(currentSrc.split('/').pop()?.split('?')[0] || '');
+  const searchName = originalPath ? decodeURIComponent(originalPath.split('/').pop()?.split('?')[0] || '') : rawTargetName;
+
+  if (POSTIMAGES_MAP[searchName] && target.src !== POSTIMAGES_MAP[searchName]) {
+    target.src = POSTIMAGES_MAP[searchName];
+    return;
+  }
+
+  const cleanSearchName = searchName.replace(/\(%20\)/g, '').replace(/\(2\)/g, '2');
+  if (POSTIMAGES_MAP[cleanSearchName] && target.src !== POSTIMAGES_MAP[cleanSearchName]) {
+    target.src = POSTIMAGES_MAP[cleanSearchName];
+    return;
+  }
+
+  // 3. Ultimate stable fallback
+  if (!target.src.includes('SALVAGE')) {
+    target.src = '/images/SALVAGE.webp';
   }
 }

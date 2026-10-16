@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, X, Check, ArrowRight, RotateCcw } from 'lucide-react';
 import { PRODUCTS } from '../data/products';
 import { FragranceProduct, FragranceCategory, PerfumeOccasion, OlfactoryFamily } from '../types';
+import { getProductImageUrl, handleImageError } from '../utils/imageHelper';
 
 interface FragranceQuizModalProps {
   isOpen: boolean;
@@ -263,10 +264,11 @@ export const FragranceQuizModal: React.FC<FragranceQuizModalProps> = ({
                     >
                       <div className="flex items-center gap-4 w-full sm:w-auto">
                         <img 
-                          src={product.image}
+                          src={getProductImageUrl(product.image)}
                           alt={product.name}
+                          decoding="async"
                           className="w-16 h-16 object-cover border border-neutral-200 shrink-0"
-                          
+                          onError={(e) => handleImageError(e, product.image)}
                         />
                         <div>
                           <span className="text-[10px] font-bold text-[#C5A059] uppercase tracking-widest block">

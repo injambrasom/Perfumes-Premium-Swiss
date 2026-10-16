@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingBag, MessageCircle, Eye, Star, Sparkles, Filter, ArrowRight, ArrowLeft, Gift } from 'lucide-react';
 import { FragranceProduct, PerfumeOccasion } from '../types';
-import { handleImageError } from '../utils/imageHelper';
+import { handleImageError, getProductImageUrl } from '../utils/imageHelper';
 import blackGoldMarbleBg from '../assets/images/black_gold_marble_bg_1786232675565.jpg';
 
 interface SignatureCollectionProps {
@@ -162,14 +162,18 @@ export const SignatureCollection: React.FC<SignatureCollectionProps> = ({
             src={blackGoldMarbleBg} 
             alt="" 
             className="absolute inset-0 w-full h-full object-cover object-center opacity-75 group-hover:scale-110 transition-transform duration-700 pointer-events-none"
+            loading="lazy"
+            decoding="async"
           />
           {/* Subtle Dark Gradient & Glowing Spotlight Aura */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40 pointer-events-none" />
           <div className={`absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] ${atmosphere.spotlightColor} via-transparent to-transparent opacity-60 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`} />
 
           <img 
-            src={product.image}
+            src={getProductImageUrl(product.image)}
             alt={product.name}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-contain object-center drop-shadow-[0_12px_28px_rgba(0,0,0,0.9)] transform transition-transform duration-500 group-hover:scale-105 z-1 relative"
             onError={(e) => handleImageError(e, product.image)}
           />
