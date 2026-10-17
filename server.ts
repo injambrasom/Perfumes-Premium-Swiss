@@ -172,8 +172,21 @@ function validateMercadoPagoCredentialsOnStartup() {
 // Call validation AFTER constants are declared to avoid TDZ (Temporal Dead Zone)
 validateMercadoPagoCredentialsOnStartup();
 
+const args = process.argv.slice(2);
+let parsedPort = process.env.PORT || process.env.DEFAULT_APP_PORT || '3000';
+let parsedHost = '0.0.0.0';
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--port' && args[i + 1]) {
+    parsedPort = args[i + 1];
+  }
+  if (args[i] === '--host' && args[i + 1]) {
+    parsedHost = args[i + 1];
+  }
+}
+const PORT = parseInt(parsedPort, 10) || 3000;
+const HOST = parsedHost;
+
 const app = express();
-const PORT = parseInt(process.env.PORT || process.env.DEFAULT_APP_PORT || '3000', 10);
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
@@ -1806,7 +1819,10 @@ async function startServer() {
       const viteModuleName = 'vite';
       const { createServer: createViteServer } = await import(viteModuleName);
       const vite = await createViteServer({
-        server: { middlewareMode: true },
+        server: { 
+          middlewareMode: true,
+          hmr: false
+        },
         appType: 'spa',
       });
       app.use(vite.middlewares);
@@ -1821,9 +1837,20 @@ async function startServer() {
   const isVercelServerless = !!(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
 
   if (!isVercelServerless) {
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running on http://0.0.0.0:${PORT}`);
+    const server = app.listen(PORT, HOST, () => {
+      console.log(`\n  ➜  Local:   http://localhost:${PORT}/`);
+      console.log(`  ➜  Network: http://${HOST}:${PORT}/\n`);
+      console.log(`Server running on http://${HOST}:${PORT}`);
     });
+
+    const shutdown = () => {
+      server.close(() => {
+        process.exit(0);
+      });
+      setTimeout(() => process.exit(0), 1500).unref();
+    };
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
   }
 }
 
