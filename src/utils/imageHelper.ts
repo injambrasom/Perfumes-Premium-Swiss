@@ -73,7 +73,7 @@ export const POSTIMAGES_MAP: Record<string, string> = {
   'aliem-swiss.png': 'https://i.postimg.cc/hzgP6HB3/Aliem-Swiss-(2).png',
   '2I2-VIPs-WOMAN.png': 'https://i.postimg.cc/KR64GgW1/2I2-VIPs-WOMAN.png',
   'COCO-MADAMME.jpg': 'https://i.postimg.cc/t15gNvCw/COCO-MADAMME.jpg',
-  'LIBRE.png': 'https://i.postimg.cc/rzzp5JXw/LIBRE.png'
+  'LIBRE.png': 'https://i.postimg.cc/ryfGRDqY/LIBRE.png'
 };
 
 export function getProductImageUrl(imagePath?: string): string {
