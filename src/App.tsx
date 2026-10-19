@@ -3,6 +3,8 @@ import { ShoppingBag } from 'lucide-react';
 import blackGoldMarbleBg from './assets/images/black_gold_marble_bg_1786232675565.jpg';
 const LOGO_IMAGE_URL = '/logo.webp';
 import { Header } from './components/Header';
+import { HeroVideo } from './components/HeroVideo';
+import { MarqueeTicker } from './components/MarqueeTicker';
 import { Hero } from './components/Hero';
 import { ReferenceSearchModal } from './components/ReferenceSearchModal';
 import { FragranceQuizModal } from './components/FragranceQuizModal';
@@ -242,14 +244,29 @@ export default function App() {
 
       {/* Main Content */}
       <main className="w-full max-w-full overflow-x-hidden">
-        {/* 1. Hero Section (Unified Auto-Sliding Banner Carousel) */}
-        <Hero
-          onChoosePerfume={handleChoosePerfumeScroll}
-          onOpenWhatsApp={handleWhatsAppDirect}
-          onOpenTrioBuilder={() => setIsTrioModalOpen(true)}
-          products={products}
-          onQuickView={(p) => setSelectedProduct(p)}
+        {/* 1. Fullscreen Video no Topo (Estilo Attracione) */}
+        <HeroVideo
+          onScrollToBanners={() => {
+            const el = document.getElementById('hero-banners-section');
+            el?.scrollIntoView({ behavior: 'smooth' });
+          }}
         />
+
+        {/* 2. Faixa Letreiro Contínua com Promoções */}
+        <MarqueeTicker
+          onOpenTrioBuilder={() => setIsTrioModalOpen(true)}
+        />
+
+        {/* 3. Banners Promocionais Logo Abaixo do Vídeo */}
+        <div id="hero-banners-section">
+          <Hero
+            onChoosePerfume={handleChoosePerfumeScroll}
+            onOpenWhatsApp={handleWhatsAppDirect}
+            onOpenTrioBuilder={() => setIsTrioModalOpen(true)}
+            products={products}
+            onQuickView={(p) => setSelectedProduct(p)}
+          />
+        </div>
 
         {/* 2. Destaques & Catálogo Principal */}
         <SignatureCollection
