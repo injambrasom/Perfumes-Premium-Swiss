@@ -321,7 +321,12 @@ export default function App() {
         {/* 8. Avaliações e Clientes Satisfeitos */}
         <Testimonials />
 
-        {/* 9. CTA Final de Fechamento */}
+        {/* 9. Nossos Reels no Instagram */}
+        <div id="instagram-reels-section">
+          <InstagramGallery />
+        </div>
+
+        {/* 10. CTA Final de Fechamento */}
         <section className="py-20 bg-black text-white text-center border-t border-white/10 px-4">
           <div className="max-w-2xl mx-auto space-y-5">
             <h2 className="font-serif text-2xl sm:text-4xl font-normal">

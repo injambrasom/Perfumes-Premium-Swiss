@@ -53,7 +53,8 @@ export const Header: React.FC<HeaderProps> = ({
     { label: 'Femininos', value: 'Feminino' },
     { label: 'Árabes', value: 'Árabe' },
     { label: 'Nicho', value: 'Nicho' },
-    { label: 'Mais Vendidos', value: 'Mais Vendidos' }
+    { label: 'Mais Vendidos', value: 'Mais Vendidos' },
+    { label: 'Instagram Reels', value: 'Instagram' }
   ];
 
   const handleWhatsAppContact = () => {
@@ -73,6 +74,16 @@ export const Header: React.FC<HeaderProps> = ({
     if (val === 'Todos' || val === 'Início') {
       onSelectCategory('Todos');
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (val === 'Instagram') {
+      const el = document.getElementById('instagram-reels-section');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        window.open('https://instagram.com/tiago_perfumespremiumswiss', '_blank');
+      }
       return;
     }
 
